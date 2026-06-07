@@ -1,0 +1,58 @@
+import express from 'express';
+import { authenticate, authorize } from '../middleware/auth.js';
+import {
+  getActiveEvent, getPublicEvents, getPastEvents, getEvent, getEventSchedule, getEventSpeakers,
+  adminListEvents, createEvent, updateEvent, changeEventStatus, deleteEvent,
+  addEventDay, updateEventDay, deleteEventDay,
+  addLecture, updateLecture, deleteLecture,
+  addSpeaker, updateSpeaker, deleteSpeaker,
+  getTicketTypes, addTicketType, updateTicketType
+} from '../controllers/eventController.js';
+
+const router = express.Router();
+
+// Public
+router.get('/', getPublicEvents);
+router.get('/active', getActiveEvent);
+router.get('/past', getPastEvents);
+router.get('/:id', getEvent);
+router.get('/:id/schedule', getEventSchedule);
+router.get('/:id/speakers', getEventSpeakers);
+router.get('/:id/ticket-types', getTicketTypes);
+router.get('/:id/lectures', getEventSchedule); // alias – returns lectures
+router.get('/:id/days', async (req,res,next) => {
+  try {
+    const { query } = await import('../database/db.js');
+    const [rows] = await query('SELECT * FROM event_days WHERE event_id=? ORDER BY day_number',[req.params.id]);
+    (await import('../utils/response.js')).success(res, rows);
+  } catch(e){next(e);}
+});
+
+// Admin
+router.get('/admin/all', authenticate, authorize('super_admin', 'admin'), adminListEvents);
+router.post('/', authenticate, authorize('super_admin', 'admin'), createEvent);
+router.put('/:id', authenticate, authorize('super_admin', 'admin'), updateEvent);
+router.delete('/:id', authenticate, authorize('super_admin'), deleteEvent);
+router.put('/:id/status', authenticate, authorize('super_admin', 'admin'), changeEventStatus);
+router.patch('/:id/status', authenticate, authorize('super_admin', 'admin'), changeEventStatus);
+
+// Days
+router.post('/:id/days', authenticate, authorize('super_admin', 'admin'), addEventDay);
+router.put('/:id/days/:dayId', authenticate, authorize('super_admin', 'admin'), updateEventDay);
+router.delete('/:id/days/:dayId', authenticate, authorize('super_admin', 'admin'), deleteEventDay);
+
+// Lectures
+router.post('/:id/lectures', authenticate, authorize('super_admin', 'admin'), addLecture);
+router.put('/:id/lectures/:lid', authenticate, authorize('super_admin', 'admin'), updateLecture);
+router.delete('/:id/lectures/:lid', authenticate, authorize('super_admin', 'admin'), deleteLecture);
+
+// Speakers
+router.post('/:id/speakers', authenticate, authorize('super_admin', 'admin'), addSpeaker);
+router.put('/:id/speakers/:sid', authenticate, authorize('super_admin', 'admin'), updateSpeaker);
+router.delete('/:id/speakers/:sid', authenticate, authorize('super_admin', 'admin'), deleteSpeaker);
+
+// Ticket Types
+router.post('/:id/ticket-types', authenticate, authorize('super_admin', 'admin'), addTicketType);
+router.put('/:id/ticket-types/:tid', authenticate, authorize('super_admin', 'admin'), updateTicketType);
+
+export default router;

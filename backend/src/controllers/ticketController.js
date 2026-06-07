@@ -1,0 +1,371 @@
+import { query, transaction } from '../database/db.js';
+import { success, created, error, notFound as notFoundRes } from '../utils/response.js';
+import { initializeTransaction, verifyTransaction, verifyWebhookSignature } from '../services/paystackService.js';
+import { generateQRCodeSVG, ticketQRData } from '../services/qrcodeService.js';
+import { sendTicketEmail } from '../services/emailService.js';
+import {
+  generateTicketNumber, generatePaystackRef,
+  toKobo, fromKobo, getEffectivePrice
+} from '../utils/helpers.js';
+
+// ── Initiate Ticket Purchase ─────────────────────────────────
+export const initiateTicketPurchase = async (req, res, next) => {
+  try {
+    const {
+      event_id, ticket_type_id,
+      name, email, phone, gender,
+      state_of_origin, occupation, organisation, how_heard
+    } = req.body;
+
+    // Validate event (status = 'active' is the only gate; no separate registration_open column)
+    const [events] = await query(
+      "SELECT * FROM events WHERE id = ? AND status = 'active'",
+      [event_id]
+    );
+    if (!events.length) {
+      return error(res, 'This event is not available for registration at the moment.');
+    }
+
+    // Validate ticket type (quantity_available / quantity_sold per schema)
+    const [ticketTypes] = await query(
+      'SELECT * FROM ticket_types WHERE id = ? AND event_id = ? AND is_active = 1',
+      [ticket_type_id, event_id]
+    );
+    if (!ticketTypes.length) {
+      return error(res, 'The selected ticket type is not available.');
+    }
+
+    const ticketType = ticketTypes[0];
+
+    // Check capacity (schema uses quantity_available / quantity_sold)
+    if (ticketType.quantity_available && ticketType.quantity_sold >= ticketType.quantity_available) {
+      return error(res, `Sorry, ${ticketType.name} tickets are sold out.`, 409);
+    }
+
+    // Determine price (respect early_bird_closes_at from event)
+    const earlyBirdOpen = events[0].early_bird_closes_at && new Date(events[0].early_bird_closes_at) > new Date();
+    const isEarlyBird   = earlyBirdOpen && !!ticketType.early_bird_price;
+    const price         = isEarlyBird ? parseFloat(ticketType.early_bird_price) : parseFloat(ticketType.regular_price);
+    const amountKobo    = toKobo(price);
+
+    // Find or create participant (schema: name, email, phone, gender, occupation)
+    let participantId;
+    const [existing] = await query('SELECT id FROM participants WHERE email = ?', [email.toLowerCase()]);
+
+    if (existing.length) {
+      participantId = existing[0].id;
+      await query(
+        'UPDATE participants SET name = ?, phone = ?, updated_at = NOW() WHERE id = ?',
+        [name, phone, participantId]
+      );
+    } else {
+      const [inserted] = await query(
+        `INSERT INTO participants (name, email, phone, gender, occupation)
+         VALUES (?, ?, ?, ?, ?)`,
+        [name, email.toLowerCase(), phone, gender || null, occupation || null]
+      );
+      participantId = inserted.insertId;
+    }
+
+    // Check for existing paid ticket
+    const [existingTicket] = await query(
+      "SELECT id, unique_number FROM tickets WHERE participant_id = ? AND event_id = ? AND status = 'paid'",
+      [participantId, event_id]
+    );
+    if (existingTicket.length) {
+      return error(
+        res,
+        `You already have a registered ticket for this event (${existingTicket[0].unique_number}). Check your email for your ticket details.`,
+        409
+      );
+    }
+
+    // Generate ticket number
+    const [[{ nextSeq }]] = await query(
+      'SELECT COALESCE(MAX(id), 0) + 1 AS nextSeq FROM tickets'
+    );
+    const uniqueNumber = generateTicketNumber(events[0].edition || '3', nextSeq);
+    const paystackRef = generatePaystackRef('MYS');
+
+    // Create pending ticket
+    await query(
+      `INSERT INTO tickets (participant_id, event_id, ticket_type_id, unique_number, paystack_reference, amount_paid, status)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
+      [participantId, event_id, ticket_type_id, uniqueNumber, paystackRef, price]
+    );
+
+    // Init Paystack
+    const paystackData = await initializeTransaction({
+      email: email.toLowerCase(),
+      amount: amountKobo,
+      reference: paystackRef,
+      metadata: {
+        custom_fields: [
+          { display_name: 'Full Name', variable_name: 'name', value: name },
+          { display_name: 'Ticket Type', variable_name: 'ticket_type', value: ticketType.name },
+          { display_name: 'Ticket Number', variable_name: 'ticket_number', value: uniqueNumber },
+          { display_name: 'Event', variable_name: 'event', value: events[0].title },
+        ],
+        participant_id: participantId,
+        ticket_number: uniqueNumber,
+        is_early_bird: isEarlyBird,
+      },
+    });
+
+    return success(res, {
+      authorization_url: paystackData.authorization_url,
+      reference: paystackRef,
+      ticket_number: uniqueNumber,
+      amount: price,
+      is_early_bird: isEarlyBird,
+    }, 'Payment initiated. Complete your payment to confirm your ticket.');
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── Verify Payment ────────────────────────────────────────────
+export const verifyTicketPayment = async (req, res, next) => {
+  try {
+    const { reference } = req.params;
+
+    const [tickets] = await query(
+      `SELECT t.*, p.name AS participant_name, p.email AS participant_email,
+              e.title AS event_title, e.edition, e.start_date, e.venue,
+              tt.name AS ticket_type_name
+       FROM tickets t
+       JOIN participants p ON p.id = t.participant_id
+       JOIN events e ON e.id = t.event_id
+       JOIN ticket_types tt ON tt.id = t.ticket_type_id
+       WHERE t.paystack_reference = ?`,
+      [reference]
+    );
+
+    if (!tickets.length) {
+      return notFoundRes(res, 'Ticket');
+    }
+
+    const ticket = tickets[0];
+
+    // Already paid
+    if (ticket.status === 'paid') {
+      return success(res, { ticket, alreadyPaid: true }, 'Ticket already confirmed.');
+    }
+
+    // Verify with Paystack
+    const txData = await verifyTransaction(reference);
+
+    if (txData.status !== 'success') {
+      return error(res, `Payment was not successful. Status: ${txData.status}. Please try again or contact support.`);
+    }
+
+    // Generate QR code
+    const qrData = ticketQRData(ticket.unique_number);
+    const qrSvg = await generateQRCodeSVG(qrData);
+
+    await transaction(async (conn) => {
+      // Confirm ticket
+      await conn.execute(
+        `UPDATE tickets SET status = 'paid', verified_at = NOW(), qr_code_svg = ?, qr_code_data = ? WHERE id = ?`,
+        [qrSvg, qrData, ticket.id]
+      );
+
+      // Increment sold_count
+      await conn.execute(
+        'UPDATE ticket_types SET sold_count = sold_count + 1 WHERE id = ?',
+        [ticket.ticket_type_id]
+      );
+
+      // Increment participant total_events
+      await conn.execute(
+        'UPDATE participants SET total_events = total_events + 1, updated_at = NOW() WHERE id = ?',
+        [ticket.participant_id]
+      );
+    });
+
+    const updatedTicket = { ...ticket, status: 'paid', qr_code_svg: qrSvg, qr_code_data: qrData };
+
+    // Send ticket email (non-blocking)
+    sendTicketEmail(updatedTicket).then(() => {
+      query('UPDATE tickets SET email_sent = 1 WHERE id = ?', [ticket.id]);
+    }).catch(console.error);
+
+    return success(res, { ticket: updatedTicket }, '🎉 Payment confirmed! Your ticket is ready. Check your email for details.');
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── Paystack Webhook ──────────────────────────────────────────
+export const paystackWebhook = async (req, res, next) => {
+  try {
+    const signature = req.headers['x-paystack-signature'];
+    const body = JSON.stringify(req.body);
+
+    if (!verifyWebhookSignature(body, signature)) {
+      return res.status(401).send('Invalid webhook signature');
+    }
+
+    const { event, data } = req.body;
+
+    if (event === 'charge.success') {
+      const reference = data.reference;
+      const [tickets] = await query(
+        "SELECT id, participant_id, ticket_type_id, unique_number FROM tickets WHERE paystack_reference = ? AND status = 'pending'",
+        [reference]
+      );
+
+      if (tickets.length) {
+        const ticket = tickets[0];
+        const qrData = ticketQRData(ticket.unique_number);
+        const qrSvg = await generateQRCodeSVG(qrData);
+
+        await transaction(async (conn) => {
+          await conn.execute(
+            "UPDATE tickets SET status = 'paid', verified_at = NOW(), qr_code_svg = ?, qr_code_data = ? WHERE id = ?",
+            [qrSvg, qrData, ticket.id]
+          );
+          await conn.execute(
+            'UPDATE ticket_types SET sold_count = sold_count + 1 WHERE id = ?',
+            [ticket.ticket_type_id]
+          );
+          await conn.execute(
+            'UPDATE participants SET total_events = total_events + 1, updated_at = NOW() WHERE id = ?',
+            [ticket.participant_id]
+          );
+        });
+      }
+    }
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('Webhook error:', err);
+    res.sendStatus(200); // Always return 200 to Paystack
+  }
+};
+
+// ── Get Ticket by Unique Number ──────────────────────────────
+export const getTicket = async (req, res, next) => {
+  try {
+    const { uniqueNumber } = req.params;
+
+    const [tickets] = await query(
+      `SELECT t.*, p.name AS participant_name, p.email AS participant_email,
+              e.title AS event_title, e.start_date, e.end_date, e.venue, e.venue_address, e.edition,
+              tt.name AS ticket_type_name,
+              a.tag_number, a.checked_in_at
+       FROM tickets t
+       JOIN participants p ON p.id = t.participant_id
+       JOIN events e ON e.id = t.event_id
+       JOIN ticket_types tt ON tt.id = t.ticket_type_id
+       LEFT JOIN attendance att ON att.ticket_id = t.id
+       LEFT JOIN event_tags a ON a.id = att.tag_id
+       WHERE t.unique_number = ?`,
+      [uniqueNumber]
+    );
+
+    if (!tickets.length) return notFoundRes(res, 'Ticket');
+
+    const ticket = tickets[0];
+    if (ticket.status !== 'paid') {
+      return error(res, 'This ticket has not been confirmed. Payment may be pending or cancelled.');
+    }
+
+    return success(res, ticket);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── Admin: Get All Tickets ────────────────────────────────────
+export const adminGetTickets = async (req, res, next) => {
+  try {
+    const { event_id, status, search } = req.query;
+
+    let sql = `
+      SELECT t.id, t.unique_number, t.status, t.amount_paid, t.purchased_at,
+             p.name AS participant_name, p.email AS participant_email, p.phone,
+             tt.name AS ticket_type_name,
+             et.tag_number,
+             a.checked_in_at
+      FROM tickets t
+      JOIN participants p ON p.id = t.participant_id
+      JOIN ticket_types tt ON tt.id = t.ticket_type_id
+      LEFT JOIN attendance a ON a.ticket_id = t.id
+      LEFT JOIN event_tags et ON et.id = a.tag_id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (event_id) { sql += ' AND t.event_id = ?'; params.push(event_id); }
+    if (status) { sql += ' AND t.status = ?'; params.push(status); }
+    if (search) {
+      sql += ' AND (p.name LIKE ? OR p.email LIKE ? OR t.unique_number LIKE ?)';
+      const s = `%${search}%`;
+      params.push(s, s, s);
+    }
+
+    sql += ' ORDER BY t.purchased_at DESC';
+
+    const [tickets] = await query(sql, params);
+    return success(res, tickets);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── Admin: Ticket Stats ───────────────────────────────────────
+export const adminTicketStats = async (req, res, next) => {
+  try {
+    const { eventId } = req.params;
+
+    const [[stats]] = await query(
+      `SELECT
+         COUNT(*) AS total,
+         SUM(status = 'paid') AS paid,
+         SUM(status = 'pending') AS pending,
+         SUM(status = 'cancelled') AS cancelled,
+         SUM(CASE WHEN status = 'paid' THEN amount_paid ELSE 0 END) AS total_revenue
+       FROM tickets WHERE event_id = ?`,
+      [eventId]
+    );
+
+    const [byType] = await query(
+      `SELECT tt.name, COUNT(*) AS count, SUM(t.amount_paid) AS revenue
+       FROM tickets t JOIN ticket_types tt ON tt.id = t.ticket_type_id
+       WHERE t.event_id = ? AND t.status = 'paid'
+       GROUP BY tt.id`,
+      [eventId]
+    );
+
+    const [[attStats]] = await query(
+      `SELECT COUNT(*) AS checked_in FROM attendance
+       WHERE event_id = ? AND check_in_at IS NOT NULL`,
+      [eventId]
+    );
+
+    const [[tagStats]] = await query(
+      `SELECT COUNT(*) AS tags_assigned FROM event_tags
+       WHERE event_id = ? AND ticket_id IS NOT NULL`,
+      [eventId]
+    );
+
+    const [[partStats]] = await query(
+      `SELECT COUNT(DISTINCT participant_id) AS participants FROM tickets
+       WHERE event_id = ? AND status = 'paid'`,
+      [eventId]
+    );
+
+    return success(res, {
+      ...stats,
+      byType,
+      // Dashboard field aliases
+      total_sold:    stats.paid    || 0,
+      checked_in:    attStats.checked_in  || 0,
+      tags_assigned: tagStats.tags_assigned || 0,
+      participants:  partStats.participants  || 0,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
