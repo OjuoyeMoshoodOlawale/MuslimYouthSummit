@@ -104,14 +104,15 @@ const loading = ref(true);
 const error   = ref('');
 
 onMounted(async () => {
-  // The URL can contain either a reference (from Paystack callback) or the unique ticket number
   const ref_ = route.params.ref || route.query.reference;
   try {
-    // Try verify by Paystack reference first
     if (route.query.reference) {
+      // Paystack callback — verify payment and get ticket
       const { data } = await api.get(`/tickets/verify/${route.query.reference}`);
-      ticket.value = data.data;
+      // verifyTicketPayment returns { ticket: {...} } or { ticket: {...}, alreadyPaid: true }
+      ticket.value = data.data?.ticket || data.data;
     } else {
+      // Direct ticket lookup by unique number
       const { data } = await api.get(`/tickets/${ref_}`);
       ticket.value = data.data;
     }

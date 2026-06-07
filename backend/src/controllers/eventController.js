@@ -46,18 +46,30 @@ export const getPublicEvents = async (req, res, next) => {
 // ── Get Past Events ─────────────────────────────────────────
 export const getPastEvents = async (req, res, next) => {
   try {
+    const includeGallery = req.query.include_gallery === '1';
+
     const [events] = await query(
-      `SELECT e.id, e.title, e.subtitle, e.edition, e.theme,
-              e.start_date, e.end_date, e.venue, e.banner_image,
-              COUNT(DISTINCT t.id) AS total_participants,
-              COUNT(DISTINCT g.id) AS gallery_count
+      `SELECT e.id, e.title, e.tagline, e.edition,
+              e.start_date, e.end_date, e.venue, e.cover_image_url,
+              COUNT(DISTINCT t.id)  AS total_participants,
+              COUNT(DISTINCT g.id)  AS gallery_count
        FROM events e
        LEFT JOIN tickets t ON t.event_id = e.id AND t.status = 'paid'
        LEFT JOIN event_gallery g ON g.event_id = e.id
-       WHERE e.status = 'completed'
+       WHERE e.status IN ('completed','archived')
        GROUP BY e.id
        ORDER BY e.start_date DESC`
     );
+
+    if (includeGallery && events.length) {
+      for (const ev of events) {
+        const [imgs] = await query(
+          'SELECT id, image_url, thumbnail_url, caption FROM event_gallery WHERE event_id = ? ORDER BY sort_order LIMIT 20',
+          [ev.id]
+        );
+        ev.gallery = imgs;
+      }
+    }
 
     return success(res, events);
   } catch (err) {

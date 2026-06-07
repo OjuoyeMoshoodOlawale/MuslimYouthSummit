@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS admins (
   password    VARCHAR(255) NOT NULL,
   role        ENUM('super_admin','admin','attendant') NOT NULL DEFAULT 'admin',
   is_active   TINYINT(1) NOT NULL DEFAULT 1,
+  last_login  DATETIME,
   created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
@@ -61,7 +62,6 @@ CREATE TABLE IF NOT EXISTS event_days (
   FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
   UNIQUE KEY uq_event_day (event_id, day_number)
 ) ENGINE=InnoDB;
-
 -- -------------------------------------------------------------
 -- SPEAKERS
 -- -------------------------------------------------------------
@@ -151,6 +151,8 @@ CREATE TABLE IF NOT EXISTS tickets (
   paystack_reference  VARCHAR(100) UNIQUE,
   status              ENUM('pending','paid','cancelled') NOT NULL DEFAULT 'pending',
   is_early_bird       TINYINT(1) NOT NULL DEFAULT 0,
+  qr_code_data        TEXT COMMENT 'raw QR payload string',
+  verified_at         DATETIME COMMENT 'when Paystack payment was confirmed',
   purchased_at        DATETIME,
   created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (event_id) REFERENCES events(id),

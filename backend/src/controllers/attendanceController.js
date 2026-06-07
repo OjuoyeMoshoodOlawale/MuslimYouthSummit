@@ -1,248 +1,265 @@
 import { query, transaction } from '../database/db.js';
 import { success, error, notFound as notFoundRes } from '../utils/response.js';
+import { generateQRCodeSVG } from '../services/qrcodeService.js';
 
-// ── Check In (scan ticket QR or enter number) ────────────────
+/* ── Step 1: Validate ticket (scan) — returns info for attendant ─ */
 export const checkIn = async (req, res, next) => {
   try {
-    const { unique_number, event_id, day_id } = req.body;
+    const { unique_number, event_id } = req.body;
 
-    // Validate ticket
     const [tickets] = await query(
-      `SELECT t.*, p.name, p.email, p.phone, tt.name AS ticket_type_name
+      `SELECT t.id, t.status, t.unique_number,
+              p.name, p.email, p.phone,
+              tt.name AS ticket_type_name,
+              c.name  AS category_name,
+              a.checked_in_at, a.checked_out_at, a.id AS attendance_id,
+              et.tag_number
        FROM tickets t
-       JOIN participants p ON p.id = t.participant_id
+       JOIN participants p  ON p.id  = t.participant_id
        JOIN ticket_types tt ON tt.id = t.ticket_type_id
+       LEFT JOIN event_categories c ON c.id = t.category_id
+       LEFT JOIN attendance a   ON a.ticket_id = t.id AND a.event_id = ?
+       LEFT JOIN event_tags et  ON et.id = a.tag_id
        WHERE t.unique_number = ? AND t.event_id = ?`,
-      [unique_number, event_id]
+      [event_id, unique_number, event_id]
     );
 
-    if (!tickets.length) {
-      return error(res, `❌ No ticket found with number "${unique_number}". Please verify the ticket.`, 404);
-    }
+    if (!tickets.length) return error(res, `No ticket found: "${unique_number}"`, 404);
+    const tk = tickets[0];
 
-    const ticket = tickets[0];
-
-    if (ticket.status !== 'paid') {
-      return error(res, `⚠️ This ticket is not valid (Status: ${ticket.status}). Payment may not be complete.`, 400);
-    }
-
-    // Check if already checked in for this day
-    const dayCondition = day_id ? 'AND a.day_id = ?' : 'AND a.day_id IS NULL';
-    const dayParam = day_id ? [day_id] : [];
-
-    const [existing] = await query(
-      `SELECT id, checked_in_at FROM attendance
-       WHERE ticket_id = ? AND event_id = ? ${dayCondition}`,
-      [ticket.id, event_id, ...dayParam]
-    );
-
-    if (existing.length && existing[0].checked_in_at) {
-      const checkedInTime = new Date(existing[0].checked_in_at).toLocaleString('en-NG', {
-        timeZone: 'Africa/Lagos',
-      });
-      return error(res, `⚠️ ${ticket.name} has already been checked in at ${checkedInTime}.`, 409);
-    }
+    if (tk.status !== 'paid')
+      return error(res, `Ticket not valid (status: ${tk.status})`, 400);
 
     return success(res, {
-      ticket_id: ticket.id,
-      unique_number: ticket.unique_number,
-      participant_name: ticket.name,
-      participant_email: ticket.email,
-      participant_phone: ticket.phone,
-      ticket_type: ticket.ticket_type_name,
-      status: 'valid',
-      ready_for_check_in: true,
-    }, `✅ Valid ticket for ${ticket.name}. Assign a tag to complete check-in.`);
-  } catch (err) {
-    next(err);
-  }
+      id: tk.id,
+      unique_number:       tk.unique_number,
+      participant_name:    tk.name,
+      participant_email:   tk.email,
+      participant_phone:   tk.phone,
+      ticket_type_name:    tk.ticket_type_name,
+      category_name:       tk.category_name,
+      check_in_at:         tk.checked_in_at,
+      check_out_at:        tk.checked_out_at,
+      attendance_id:       tk.attendance_id,
+      tag_number:          tk.tag_number,
+    }, tk.checked_in_at ? '⚠️ Already checked in' : '✅ Valid ticket');
+  } catch (e) { next(e); }
 };
 
-// ── Assign Tag & Complete Check-In ───────────────────────────
+/* ── Step 2 (combined): Assign tag + complete check-in ──────── */
 export const assignTagAndCheckIn = async (req, res, next) => {
   try {
-    const { ticket_id, tag_number, event_id, day_id } = req.body;
+    const { ticket_id, tag_number, event_id } = req.body;
 
-    // Validate ticket
+    if (!ticket_id || !event_id)
+      return error(res, 'ticket_id and event_id are required.', 400);
+
+    /* Validate paid ticket */
     const [tickets] = await query(
       "SELECT id, participant_id, unique_number FROM tickets WHERE id = ? AND status = 'paid'",
       [ticket_id]
     );
-    if (!tickets.length) return error(res, 'Invalid ticket ID.', 404);
-
+    if (!tickets.length) return error(res, 'Invalid or unpaid ticket.', 404);
     const ticket = tickets[0];
 
-    // Validate tag
-    const [tags] = await query(
-      'SELECT id, ticket_id FROM event_tags WHERE tag_number = ? AND event_id = ?',
-      [tag_number, event_id]
+    /* Check already checked in */
+    const [existing] = await query(
+      'SELECT id, checked_in_at FROM attendance WHERE ticket_id = ? AND event_id = ?',
+      [ticket_id, event_id]
     );
-
-    if (!tags.length) {
-      return error(res, `Tag "${tag_number}" was not found for this event. Please check the tag number.`, 404);
+    if (existing.length && existing[0].checked_in_at) {
+      return error(res, '⚠️ This participant is already checked in.', 409);
     }
 
-    const tag = tags[0];
+    let tagId = null;
 
-    if (tag.ticket_id) {
-      // Check if it's assigned to someone else
-      if (tag.ticket_id !== ticket_id) {
-        return error(res, `⚠️ Tag "${tag_number}" is already assigned to another participant.`, 409);
+    /* Handle tag assignment — auto-creates tag if scanned externally (barcode not pre-registered) */
+    if (tag_number) {
+      const tagNum = tag_number.toUpperCase().trim();
+      let [tags] = await query(
+        'SELECT id, ticket_id FROM event_tags WHERE tag_number = ? AND event_id = ?',
+        [tagNum, event_id]
+      );
+
+      if (!tags.length) {
+        // Tag scanned but not pre-generated — create it on the fly
+        const qrSvg = await generateQRCodeSVG(`MYS-TAG:${tagNum}`).catch(() => null);
+        const [ins] = await query(
+          'INSERT INTO event_tags (event_id, tag_number, qr_code_svg) VALUES (?, ?, ?)',
+          [event_id, tagNum, qrSvg]
+        );
+        tags = [{ id: ins.insertId, ticket_id: null }];
       }
+
+      const tag = tags[0];
+      if (tag.ticket_id && tag.ticket_id !== Number(ticket_id)) {
+        return error(res, `Tag "${tagNum}" is already assigned to another participant.`, 409);
+      }
+      tagId = tag.id;
+
+      await query(
+        'UPDATE event_tags SET ticket_id=?, participant_id=?, assigned_at=NOW(), assigned_by=? WHERE id=?',
+        [ticket_id, ticket.participant_id, req.admin?.id || null, tagId]
+      );
     }
 
-    await transaction(async (conn) => {
-      // Assign tag to ticket
-      await conn.execute(
-        `UPDATE event_tags SET ticket_id = ?, participant_id = ?, assigned_at = NOW(), assigned_by = ?
-         WHERE id = ?`,
-        [ticket_id, ticket.participant_id, req.admin?.id || null, tag.id]
+    /* Create/update attendance */
+    if (existing.length) {
+      await query(
+        'UPDATE attendance SET tag_id=?, checked_in_at=NOW(), check_in_by=? WHERE id=?',
+        [tagId, req.admin?.id || null, existing[0].id]
       );
-
-      // Create or update attendance record
-      const dayCondition = day_id ? 'day_id = ?' : 'day_id IS NULL';
-      const dayVal = day_id || null;
-
-      const [existingAttendance] = await conn.execute(
-        `SELECT id FROM attendance WHERE ticket_id = ? AND event_id = ? AND ${dayCondition}`,
-        day_id ? [ticket_id, event_id, day_id] : [ticket_id, event_id]
+    } else {
+      await query(
+        'INSERT INTO attendance (ticket_id, event_id, tag_id, checked_in_at, check_in_by) VALUES (?,?,?,NOW(),?)',
+        [ticket_id, event_id, tagId, req.admin?.id || null]
       );
+    }
 
-      if (existingAttendance[0].length) {
-        await conn.execute(
-          `UPDATE attendance SET tag_id = ?, checked_in_at = NOW(), check_in_by = ? WHERE id = ?`,
-          [tag.id, req.admin?.id || null, existingAttendance[0][0].id]
-        );
-      } else {
-        await conn.execute(
-          `INSERT INTO attendance (ticket_id, event_id, day_id, tag_id, checked_in_at, check_in_by)
-           VALUES (?, ?, ?, ?, NOW(), ?)`,
-          [ticket_id, event_id, dayVal, tag.id, req.admin?.id || null]
-        );
-      }
-    });
-
-    return success(res, { tag_number, ticket_id }, `✅ Check-in complete! Tag ${tag_number} assigned.`);
-  } catch (err) {
-    next(err);
-  }
+    const tagMsg = tag_number ? ` Tag ${tag_number.toUpperCase()} assigned.` : '';
+    return success(res, { tag_number, ticket_id },
+      `✅ Check-in complete!${tagMsg}`);
+  } catch (e) { next(e); }
 };
 
-// ── Check Out ────────────────────────────────────────────────
+/* ── Check Out ────────────────────────────────────────────── */
 export const checkOut = async (req, res, next) => {
   try {
-    const { ticket_id, event_id, day_id } = req.body;
+    const { ticket_id, attendance_id } = req.body;
 
-    const dayCondition = day_id ? 'AND day_id = ?' : 'AND day_id IS NULL';
-    const dayParam = day_id ? [day_id] : [];
-
-    const [attendance] = await query(
-      `SELECT id, checked_in_at, checked_out_at FROM attendance
-       WHERE ticket_id = ? AND event_id = ? ${dayCondition}`,
-      [ticket_id, event_id, ...dayParam]
-    );
-
-    if (!attendance.length || !attendance[0].checked_in_at) {
-      return error(res, 'This participant has not been checked in.');
+    let attendance;
+    if (attendance_id) {
+      const [rows] = await query('SELECT * FROM attendance WHERE id=?', [attendance_id]);
+      if (!rows.length) return error(res, 'Attendance record not found.', 404);
+      attendance = rows[0];
+    } else if (ticket_id) {
+      const [rows] = await query(
+        'SELECT * FROM attendance WHERE ticket_id=? ORDER BY checked_in_at DESC LIMIT 1',
+        [ticket_id]
+      );
+      if (!rows.length) return error(res, 'No check-in record found for this ticket.', 404);
+      attendance = rows[0];
+    } else {
+      return error(res, 'Provide ticket_id or attendance_id.', 400);
     }
 
-    if (attendance[0].checked_out_at) {
-      return error(res, 'This participant has already been checked out.');
-    }
+    if (!attendance.checked_in_at)
+      return error(res, 'This participant has not been checked in.', 400);
+    if (attendance.checked_out_at)
+      return error(res, 'This participant has already been checked out.', 409);
 
     await query(
-      'UPDATE attendance SET checked_out_at = NOW(), check_out_by = ? WHERE id = ?',
-      [req.admin?.id || null, attendance[0].id]
+      'UPDATE attendance SET checked_out_at=NOW(), check_out_by=? WHERE id=?',
+      [req.admin?.id || null, attendance.id]
     );
 
-    return success(res, null, '✅ Check-out recorded successfully.');
-  } catch (err) {
-    next(err);
-  }
+    return success(res, null, '✅ Check-out recorded.');
+  } catch (e) { next(e); }
 };
 
-// ── Live Attendance Dashboard ─────────────────────────────────
+/* ── Live dashboard stats ─────────────────────────────────── */
 export const liveAttendance = async (req, res, next) => {
   try {
     const { eventId } = req.params;
 
     const [[stats]] = await query(
-      `SELECT
-         COUNT(*) AS total_checked_in,
-         SUM(checked_out_at IS NOT NULL) AS checked_out,
-         SUM(checked_out_at IS NULL)     AS currently_inside
-       FROM attendance WHERE event_id = ? AND checked_in_at IS NOT NULL`,
+      `SELECT COUNT(*) AS total_checked_in,
+              SUM(checked_out_at IS NOT NULL) AS checked_out,
+              SUM(checked_out_at IS NULL)     AS currently_inside
+       FROM attendance WHERE event_id=? AND checked_in_at IS NOT NULL`,
       [eventId]
     );
 
     const [[ticketStats]] = await query(
-      "SELECT COUNT(*) AS total_registered FROM tickets WHERE event_id = ? AND status = 'paid'",
+      "SELECT COUNT(*) AS total_registered FROM tickets WHERE event_id=? AND status='paid'",
       [eventId]
     );
 
     const [recent] = await query(
-      `SELECT a.checked_in_at, p.name, p.phone, et.tag_number, tt.name AS ticket_type,
-              t.unique_number
+      `SELECT a.checked_in_at, p.name, t.unique_number,
+              et.tag_number, tt.name AS ticket_type, c.name AS category
        FROM attendance a
-       JOIN tickets t ON t.id = a.ticket_id
-       JOIN participants p ON p.id = t.participant_id
+       JOIN tickets t      ON t.id  = a.ticket_id
+       JOIN participants p ON p.id  = t.participant_id
        JOIN ticket_types tt ON tt.id = t.ticket_type_id
-       LEFT JOIN event_tags et ON et.id = a.tag_id
-       WHERE a.event_id = ? AND a.checked_in_at IS NOT NULL
+       LEFT JOIN event_tags et       ON et.id = a.tag_id
+       LEFT JOIN event_categories c  ON c.id  = t.category_id
+       WHERE a.event_id=? AND a.checked_in_at IS NOT NULL
        ORDER BY a.checked_in_at DESC LIMIT 10`,
       [eventId]
     );
 
     return success(res, {
-      total_registered:  ticketStats.total_registered,
-      checked_in:        stats.total_checked_in || 0,   // AdminAttendance: live.checked_in
-      checked_out:       stats.checked_out || 0,         // AdminAttendance: live.checked_out
-      on_premises:       stats.currently_inside || 0,    // AdminAttendance: live.on_premises
-      // Dashboard aliases
-      total_checked_in:  stats.total_checked_in || 0,
-      currently_inside:  stats.currently_inside || 0,
-      recent:            recent,                          // Dashboard: aRes.data.data?.recent
-      recent_check_ins:  recent,
+      total_registered: ticketStats.total_registered,
+      checked_in:       stats.total_checked_in || 0,
+      checked_out:      stats.checked_out      || 0,
+      on_premises:      stats.currently_inside || 0,
+      recent,
     });
-  } catch (err) {
-    next(err);
-  }
+  } catch (e) { next(e); }
 };
 
-// ── Full Attendance Report ────────────────────────────────────
+/* ── Full attendance report (paginated) ─────────────────────── */
 export const attendanceReport = async (req, res, next) => {
   try {
     const { eventId } = req.params;
-    const { day_id, search } = req.query;
+    const { search, page = 1, limit = 50 } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
 
-    let sql = `
-      SELECT a.id AS attendance_id, a.checked_in_at AS check_in_at, a.checked_out_at AS check_out_at,
-             p.name, p.email, p.phone,
-             t.unique_number, tt.name AS ticket_type,
-             et.tag_number,
-             ai.name AS checked_in_by_name
-      FROM attendance a
-      JOIN tickets t ON t.id = a.ticket_id
-      JOIN participants p ON p.id = t.participant_id
-      JOIN ticket_types tt ON tt.id = t.ticket_type_id
-      LEFT JOIN event_tags et ON et.id = a.tag_id
-      LEFT JOIN admins ai ON ai.id = a.check_in_by
-      WHERE a.event_id = ?
-    `;
+    let where = 'WHERE a.event_id = ?';
     const params = [eventId];
 
-    if (day_id) { sql += ' AND a.day_id = ?'; params.push(day_id); }
     if (search) {
-      sql += ' AND (p.name LIKE ? OR t.unique_number LIKE ? OR et.tag_number LIKE ?)';
+      where += ' AND (p.name LIKE ? OR t.unique_number LIKE ? OR et.tag_number LIKE ?)';
       const s = `%${search}%`;
       params.push(s, s, s);
     }
 
-    sql += ' ORDER BY a.checked_in_at DESC';
+    const [[{ total }]] = await query(
+      `SELECT COUNT(*) AS total FROM attendance a
+       JOIN tickets t ON t.id = a.ticket_id
+       JOIN participants p ON p.id = t.participant_id
+       LEFT JOIN event_tags et ON et.id = a.tag_id
+       ${where}`,
+      params
+    );
 
-    const [rows] = await query(sql, params);
-    return success(res, rows);
-  } catch (err) {
-    next(err);
-  }
+    const [rows] = await query(
+      `SELECT a.id AS attendance_id,
+              a.checked_in_at  AS check_in_at,
+              a.checked_out_at AS check_out_at,
+              p.name, p.email,
+              t.unique_number, tt.name AS ticket_type_name,
+              et.tag_number,
+              c.name AS category_name
+       FROM attendance a
+       JOIN tickets t       ON t.id  = a.ticket_id
+       JOIN participants p  ON p.id  = t.participant_id
+       JOIN ticket_types tt ON tt.id = t.ticket_type_id
+       LEFT JOIN event_tags et      ON et.id = a.tag_id
+       LEFT JOIN event_categories c ON c.id  = t.category_id
+       ${where}
+       ORDER BY a.checked_in_at DESC
+       LIMIT ? OFFSET ?`,
+      [...params, Number(limit), offset]
+    );
+
+    const pageNum  = Number(page);
+    const limitNum = Number(limit);
+    const totalNum = Number(total);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Success',
+      data: rows,
+      pagination: {
+        total:  totalNum,
+        page:   pageNum,
+        limit:  limitNum,
+        pages:  Math.ceil(totalNum / limitNum),
+        from:   offset + 1,
+        to:     Math.min(offset + rows.length, totalNum),
+      },
+    });
+  } catch (e) { next(e); }
 };

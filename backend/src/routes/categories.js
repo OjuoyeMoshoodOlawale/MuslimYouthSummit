@@ -1,3 +1,4 @@
+import { validate, rules } from '../middleware/validate.js';
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import {

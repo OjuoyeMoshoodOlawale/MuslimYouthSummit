@@ -60,3 +60,11 @@ export const buildPagination = (total, page, limit) => ({
   hasNext: page * limit < total,
   hasPrev: page > 1,
 });
+
+/**
+ * Success with inline pagination meta (4th argument)
+ * Used when returning paginated arrays without a wrapper
+ */
+export const successPaginated = (res, data, meta, message = 'Success') => {
+  return res.status(200).json({ success: true, message, data, pagination: meta });
+};

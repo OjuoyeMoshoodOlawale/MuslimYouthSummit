@@ -55,7 +55,7 @@
               <p class="text-sm font-semibold text-gray-800 truncate">{{ c.name }}</p>
               <p class="text-xs text-gray-400">{{ c.unique_number }}</p>
             </div>
-            <span class="text-xs text-gray-400 flex-shrink-0">{{ timeAgo(c.check_in_at) }}</span>
+            <span class="text-xs text-gray-400 flex-shrink-0">{{ timeAgo(c.checked_in_at) }}</span>
           </div>
         </div>
         <p v-else class="text-sm text-gray-400 text-center py-6">No check-ins yet</p>

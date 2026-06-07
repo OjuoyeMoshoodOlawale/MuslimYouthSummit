@@ -1,13 +1,17 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { validate, rules } from '../middleware/validate.js';
+import { query } from '../database/db.js';
+import { success } from '../utils/response.js';
 import {
-  getActiveEvent, getPublicEvents, getPastEvents, getEvent, getEventSchedule, getEventSpeakers,
+  getActiveEvent, getPublicEvents, getPastEvents, getEvent, getEventSpeakers,
   adminListEvents, createEvent, updateEvent, changeEventStatus, deleteEvent,
   addEventDay, updateEventDay, deleteEventDay,
   addLecture, updateLecture, deleteLecture,
   addSpeaker, updateSpeaker, deleteSpeaker,
   getTicketTypes, addTicketType, updateTicketType
 } from '../controllers/eventController.js';
+import { getSchedule } from '../controllers/scheduleController.js';
 
 const router = express.Router();
 
@@ -16,21 +20,20 @@ router.get('/', getPublicEvents);
 router.get('/active', getActiveEvent);
 router.get('/past', getPastEvents);
 router.get('/:id', getEvent);
-router.get('/:id/schedule', getEventSchedule);
+router.get('/:id/schedule', getSchedule);
 router.get('/:id/speakers', getEventSpeakers);
 router.get('/:id/ticket-types', getTicketTypes);
-router.get('/:id/lectures', getEventSchedule); // alias – returns lectures
-router.get('/:id/days', async (req,res,next) => {
+router.get('/:id/lectures', getSchedule); // alias
+router.get('/:id/days', async (req, res, next) => {
   try {
-    const { query } = await import('../database/db.js');
-    const [rows] = await query('SELECT * FROM event_days WHERE event_id=? ORDER BY day_number',[req.params.id]);
-    (await import('../utils/response.js')).success(res, rows);
-  } catch(e){next(e);}
+    const [rows] = await query('SELECT * FROM event_days WHERE event_id=? ORDER BY day_number', [req.params.id]);
+    success(res, rows);
+  } catch (e) { next(e); }
 });
 
 // Admin
 router.get('/admin/all', authenticate, authorize('super_admin', 'admin'), adminListEvents);
-router.post('/', authenticate, authorize('super_admin', 'admin'), createEvent);
+router.post('/', authenticate, authorize('super_admin', 'admin'), validate(rules.createEvent), createEvent);
 router.put('/:id', authenticate, authorize('super_admin', 'admin'), updateEvent);
 router.delete('/:id', authenticate, authorize('super_admin'), deleteEvent);
 router.put('/:id/status', authenticate, authorize('super_admin', 'admin'), changeEventStatus);

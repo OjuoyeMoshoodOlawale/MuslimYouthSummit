@@ -9,7 +9,7 @@ import { success, created, error, notFound } from '../utils/response.js';
 /* ── GET full schedule ───────────────────────────────────────── */
 export const getSchedule = async (req, res, next) => {
   try {
-    const { eventId } = req.params;
+    const eventId = req.params.eventId || req.params.id; // works from both routers
     const [rows] = await query(
       `SELECT
          l.id, l.s_n, l.event_day_id,
@@ -144,20 +144,34 @@ export const reorderSchedule = async (req, res, next) => {
 /* ── CLONE event schedule to new event ──────────────────────── */
 export const cloneSchedule = async (req, res, next) => {
   try {
-    const { fromEventId, toEventId } = req.body;
+    // Support: POST /events/:eventId/schedule/clone → toEventId = params.eventId
+    // Support: POST /events/schedule/clone          → fromEventId/toEventId in body
+    const fromEventId = req.body.fromEventId;
+    const toEventId   = req.body.toEventId || req.params.eventId;
 
-    // Copy days
+    // Copy days (INSERT IGNORE — skip if day_number already exists in target event)
     const [days] = await query(
       'SELECT * FROM event_days WHERE event_id=? ORDER BY day_number', [fromEventId]
     );
     const dayMap = {};
     for (const d of days) {
-      const [r] = await query(
-        `INSERT INTO event_days (event_id, day_number, event_date, theme, description)
-         VALUES (?, ?, ?, ?, ?)`,
-        [toEventId, d.day_number, d.event_date, d.theme, d.description]
-      );
-      dayMap[d.id] = r.insertId;
+      try {
+        const [r] = await query(
+          `INSERT IGNORE INTO event_days (event_id, day_number, event_date, theme, description)
+           VALUES (?, ?, ?, ?, ?)`,
+          [toEventId, d.day_number, d.event_date, d.theme, d.description]
+        );
+        if (r.insertId) {
+          dayMap[d.id] = r.insertId;
+        } else {
+          // Day already existed — find its id in target
+          const [existing] = await query(
+            'SELECT id FROM event_days WHERE event_id=? AND day_number=?',
+            [toEventId, d.day_number]
+          );
+          if (existing.length) dayMap[d.id] = existing[0].id;
+        }
+      } catch { /* skip duplicate */ }
     }
 
     // Copy lectures

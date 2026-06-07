@@ -23,10 +23,11 @@ import participantRoutes from './routes/participants.js';
 import scheduleRoutes    from './routes/schedule.js';
 import categoryRoutes    from './routes/categories.js';
 import reportsRoutes     from './routes/reports.js';
+import { cloneEvent }    from './controllers/cloneController.js';
+import { authenticate, authorize } from './middleware/auth.js';
 
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,7 +41,7 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
@@ -104,14 +105,7 @@ app.use('/api/participants', participantRoutes);
 app.use('/api', scheduleRoutes);
 app.use('/api', categoryRoutes);
 app.use('/api', reportsRoutes);
-
-// Clone event (standalone)
-import { cloneEvent } from './controllers/cloneController.js';
-app.post('/api/events/clone',
-  (await import('./middleware/auth.js')).authenticate,
-  (await import('./middleware/auth.js')).authorize('super_admin','admin'),
-  cloneEvent
-);
+app.post('/api/events/clone', authenticate, authorize('super_admin','admin'), cloneEvent);
 
 // ─── Error Handling ──────────────────────────────────────────
 app.use(notFound);

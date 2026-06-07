@@ -1,3 +1,4 @@
+import { validate, rules } from '../middleware/validate.js';
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import {
@@ -8,7 +9,7 @@ import {
 
 const router = express.Router();
 
-router.post('/initiate', initiateTicketPurchase);
+router.post('/initiate', validate(rules.ticketInitiate), initiateTicketPurchase);
 router.get('/verify/:reference', verifyTicketPayment);
 router.post('/webhook', express.raw({ type: 'application/json' }), paystackWebhook);
 router.get('/admin/all', authenticate, authorize('super_admin', 'admin'), adminGetTickets);

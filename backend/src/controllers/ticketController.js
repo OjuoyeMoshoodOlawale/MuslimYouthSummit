@@ -12,9 +12,8 @@ import {
 export const initiateTicketPurchase = async (req, res, next) => {
   try {
     const {
-      event_id, ticket_type_id,
-      name, email, phone, gender,
-      state_of_origin, occupation, organisation, how_heard
+      event_id, ticket_type_id, category_id,
+      name, email, phone, gender, occupation
     } = req.body;
 
     // Validate event (status = 'active' is the only gate; no separate registration_open column)
@@ -87,11 +86,26 @@ export const initiateTicketPurchase = async (req, res, next) => {
     const uniqueNumber = generateTicketNumber(events[0].edition || '3', nextSeq);
     const paystackRef = generatePaystackRef('MYS');
 
+    // Validate category if provided
+    if (category_id) {
+      const [cats] = await query(
+        'SELECT id, capacity FROM event_categories WHERE id=? AND event_id=? AND is_active=1',
+        [category_id, event_id]
+      );
+      if (!cats.length) return error(res, 'Invalid category selected.', 400);
+      if (cats[0].capacity) {
+        const [[{ cnt }]] = await query(
+          "SELECT COUNT(*) AS cnt FROM tickets WHERE category_id=? AND status='paid'", [category_id]
+        );
+        if (cnt >= cats[0].capacity) return error(res, 'This category is full. Please select another.', 409);
+      }
+    }
+
     // Create pending ticket
     await query(
-      `INSERT INTO tickets (participant_id, event_id, ticket_type_id, unique_number, paystack_reference, amount_paid, status)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
-      [participantId, event_id, ticket_type_id, uniqueNumber, paystackRef, price]
+      `INSERT INTO tickets (participant_id, event_id, ticket_type_id, category_id, unique_number, paystack_reference, amount_paid, is_early_bird, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+      [participantId, event_id, ticket_type_id, category_id || null, uniqueNumber, paystackRef, price, isEarlyBird ? 1 : 0]
     );
 
     // Init Paystack
@@ -166,31 +180,51 @@ export const verifyTicketPayment = async (req, res, next) => {
     await transaction(async (conn) => {
       // Confirm ticket
       await conn.execute(
-        `UPDATE tickets SET status = 'paid', verified_at = NOW(), qr_code_svg = ?, qr_code_data = ? WHERE id = ?`,
-        [qrSvg, qrData, ticket.id]
+        `UPDATE tickets SET status = 'paid', purchased_at = NOW(), qr_code_svg = ? WHERE id = ?`,
+        [qrSvg, ticket.id]
       );
 
-      // Increment sold_count
+      // Increment quantity_sold
       await conn.execute(
-        'UPDATE ticket_types SET sold_count = sold_count + 1 WHERE id = ?',
+        'UPDATE ticket_types SET quantity_sold = quantity_sold + 1 WHERE id = ?',
         [ticket.ticket_type_id]
       );
 
-      // Increment participant total_events
+      // Update participant timestamp
       await conn.execute(
-        'UPDATE participants SET total_events = total_events + 1, updated_at = NOW() WHERE id = ?',
+        'UPDATE participants SET updated_at = NOW() WHERE id = ?',
         [ticket.participant_id]
       );
     });
 
-    const updatedTicket = { ...ticket, status: 'paid', qr_code_svg: qrSvg, qr_code_data: qrData };
+    const updatedTicket = { ...ticket, status: 'paid', qr_code_svg: qrSvg };
 
     // Send ticket email (non-blocking)
     sendTicketEmail(updatedTicket).then(() => {
-      query('UPDATE tickets SET email_sent = 1 WHERE id = ?', [ticket.id]);
+      // email sent
     }).catch(console.error);
 
-    return success(res, { ticket: updatedTicket }, '🎉 Payment confirmed! Your ticket is ready. Check your email for details.');
+    // Return enriched ticket (same shape as getTicket)
+    const [enriched] = await query(
+      `SELECT t.*,
+              p.name  AS participant_name, p.email AS participant_email,
+              e.title AS event_title, e.start_date AS event_start_date,
+              e.end_date AS event_end_date, e.venue AS event_venue, e.edition,
+              tt.name AS ticket_type_name,
+              cat.name AS category_name
+       FROM tickets t
+       JOIN participants p  ON p.id  = t.participant_id
+       JOIN events e        ON e.id  = t.event_id
+       JOIN ticket_types tt ON tt.id = t.ticket_type_id
+       LEFT JOIN event_categories cat ON cat.id = t.category_id
+       WHERE t.id = ?`,
+      [ticket.id]
+    );
+
+    return success(res,
+      { ticket: enriched[0] || updatedTicket, alreadyPaid: false },
+      '🎉 Payment confirmed! Your ticket is ready.'
+    );
   } catch (err) {
     next(err);
   }
@@ -222,15 +256,15 @@ export const paystackWebhook = async (req, res, next) => {
 
         await transaction(async (conn) => {
           await conn.execute(
-            "UPDATE tickets SET status = 'paid', verified_at = NOW(), qr_code_svg = ?, qr_code_data = ? WHERE id = ?",
-            [qrSvg, qrData, ticket.id]
+            "UPDATE tickets SET status = 'paid', purchased_at = NOW(), qr_code_svg = ? WHERE id = ?",
+            [qrSvg, ticket.id]
           );
           await conn.execute(
-            'UPDATE ticket_types SET sold_count = sold_count + 1 WHERE id = ?',
+            'UPDATE ticket_types SET quantity_sold = quantity_sold + 1 WHERE id = ?',
             [ticket.ticket_type_id]
           );
           await conn.execute(
-            'UPDATE participants SET total_events = total_events + 1, updated_at = NOW() WHERE id = ?',
+            'UPDATE participants SET updated_at = NOW() WHERE id = ?',
             [ticket.participant_id]
           );
         });
@@ -250,16 +284,30 @@ export const getTicket = async (req, res, next) => {
     const { uniqueNumber } = req.params;
 
     const [tickets] = await query(
-      `SELECT t.*, p.name AS participant_name, p.email AS participant_email,
-              e.title AS event_title, e.start_date, e.end_date, e.venue, e.venue_address, e.edition,
-              tt.name AS ticket_type_name,
-              a.tag_number, a.checked_in_at
+      `SELECT t.*,
+              p.name  AS participant_name,
+              p.email AS participant_email,
+              p.phone AS participant_phone,
+              e.title        AS event_title,
+              e.start_date   AS event_start_date,
+              e.end_date     AS event_end_date,
+              e.venue        AS event_venue,
+              e.venue_address,
+              e.edition,
+              tt.name        AS ticket_type_name,
+              cat.name       AS category_name,
+              cat.color      AS category_color,
+              et.tag_number,
+              att.checked_in_at  AS check_in_at,
+              att.checked_out_at AS check_out_at,
+              att.id             AS attendance_id
        FROM tickets t
-       JOIN participants p ON p.id = t.participant_id
-       JOIN events e ON e.id = t.event_id
+       JOIN participants p  ON p.id  = t.participant_id
+       JOIN events e        ON e.id  = t.event_id
        JOIN ticket_types tt ON tt.id = t.ticket_type_id
+       LEFT JOIN event_categories cat ON cat.id = t.category_id
        LEFT JOIN attendance att ON att.ticket_id = t.id
-       LEFT JOIN event_tags a ON a.id = att.tag_id
+       LEFT JOIN event_tags et  ON et.id = att.tag_id
        WHERE t.unique_number = ?`,
       [uniqueNumber]
     );

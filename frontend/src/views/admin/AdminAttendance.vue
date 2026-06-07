@@ -23,7 +23,7 @@
       </template>
       <template #cell-check_in_at="{ row }">{{ row.check_in_at ? fmtTime(row.check_in_at) : '—' }}</template>
       <template #cell-check_out_at="{ row }">{{ row.check_out_at ? fmtTime(row.check_out_at) : '—' }}</template>
-      <template #cell-tag="{ row }">
+      <template #cell-tag_number="{ row }">
         <span v-if="row.tag_number" class="badge-gold text-xs">{{ row.tag_number }}</span>
         <span v-else class="text-gray-300 text-xs">No tag</span>
       </template>
@@ -64,7 +64,8 @@ const cols = [
   { key:'name',         label:'Participant' },
   { key:'check_in_at',  label:'Checked In'  },
   { key:'check_out_at', label:'Checked Out' },
-  { key:'tag',          label:'Tag'         },
+  { key:'tag_number',   label:'Tag'         },
+  { key:'category_name',label:'Category'    },
   { key:'status',       label:'Status'      },
 ];
 

@@ -224,7 +224,7 @@ const load = async () => {
       api.get(`/events/${id}`),
       api.get(`/events/${id}/ticket-types`),
       api.get(`/events/${id}/speakers`),
-      api.get(`/events/${id}/lectures`),
+      api.get(`/events/${id}/schedule`),
       api.get(`/events/${id}/days`),
     ]);
     event.value       = evRes.data.data;
@@ -270,6 +270,8 @@ const doClone = async () => {
   } catch (err) { alert.error(err.response?.data?.message || 'Clone failed.'); }
   finally { cloning.value = false; }
 };
+
+const addSpeaker = async () => {
   saving.value = true;
   try {
     await api.post(`/events/${id}/speakers`, spk);
@@ -283,7 +285,7 @@ const doClone = async () => {
 const addLecture = async () => {
   saving.value = true;
   try {
-    await api.post(`/events/${id}/lectures`, lec);
+    await api.post(`/events/${id}/schedule`, lec);
     alert.success('Session added.'); lectureModal.value = false;
     Object.assign(lec, { title:'', lecture_type:'lecture', event_day_id:'', start_time:'', end_time:'', description:'' });
     load();
