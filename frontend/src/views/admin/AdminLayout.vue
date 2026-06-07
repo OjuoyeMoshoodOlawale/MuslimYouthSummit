@@ -32,16 +32,20 @@ const collapsed = ref(false);
 const route     = useRoute();
 
 const titles = {
-  'admin-dashboard':    'Dashboard',
-  'admin-events':       'Events',
-  'admin-event-create': 'Create Event',
-  'admin-event-detail': 'Event Detail',
-  'admin-attendance':   'Attendance',
-  'admin-gallery':      'Gallery',
-  'admin-participants': 'Participants',
-  'admin-email':        'Email Campaigns',
-  'admin-tags':         'Event Tags',
-  'admin-admins':       'Admin Accounts',
+  'admin-dashboard':       'Dashboard',
+  'admin-event-dashboard': 'Event Progress',
+  'admin-reports':         'R&P Reports',
+  'admin-events':          'Events',
+  'admin-event-create':    'Create Event',
+  'admin-event-detail':    'Event Detail',
+  'admin-schedule':        'Event Schedule',
+  'admin-categories':      'Event Categories',
+  'admin-attendance':      'Attendance',
+  'admin-gallery':         'Gallery',
+  'admin-participants':    'Participants',
+  'admin-email':           'Email Campaigns',
+  'admin-tags':            'Event Tags',
+  'admin-admins':          'Admin Accounts',
 };
 
 const routeTitle = computed(() => titles[route.name] || 'Admin');

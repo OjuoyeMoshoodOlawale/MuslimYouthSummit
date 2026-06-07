@@ -260,3 +260,57 @@ CREATE INDEX idx_tickets_status ON tickets(status);
 CREATE INDEX idx_attendance_event ON attendance(event_id);
 CREATE INDEX idx_event_tags_event ON event_tags(event_id);
 CREATE INDEX idx_gallery_event ON event_gallery(event_id, sort_order);
+
+-- =============================================================
+-- PHASE 2 ADDITIONS
+-- =============================================================
+
+-- -------------------------------------------------------------
+-- EVENT CATEGORIES (divisions / class-level groups)
+-- Assigned to participants at registration point only
+-- -------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS event_categories (
+  id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  event_id      INT UNSIGNED NOT NULL,
+  name          VARCHAR(120) NOT NULL COMMENT 'e.g. Youth, Professionals, Brother A, Sister B',
+  description   TEXT,
+  color         VARCHAR(7) NOT NULL DEFAULT '#02462E' COMMENT 'hex colour for badge',
+  capacity      INT UNSIGNED COMMENT 'NULL = unlimited',
+  is_active     TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order    TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- link tickets → category (assigned at registration / check-in)
+ALTER TABLE tickets ADD COLUMN category_id INT UNSIGNED NULL AFTER ticket_type_id;
+ALTER TABLE tickets ADD CONSTRAINT fk_ticket_category
+  FOREIGN KEY (category_id) REFERENCES event_categories(id) ON DELETE SET NULL;
+
+-- -------------------------------------------------------------
+-- ENHANCED SCHEDULE (tabular: S/N | Day/Time | Title | Lecturer | Facilitators)
+-- Replaces the simpler lectures approach with full CRUD table
+-- -------------------------------------------------------------
+ALTER TABLE lectures
+  ADD COLUMN main_speaker_name VARCHAR(150) COMMENT 'denorm for quick display' AFTER lecture_type,
+  ADD COLUMN facilitators       TEXT          COMMENT 'comma-separated names'   AFTER main_speaker_name,
+  ADD COLUMN s_n               SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'display sequence number';
+
+-- -------------------------------------------------------------
+-- EVENT DASHBOARD SNAPSHOTS (track progress over time)
+-- Stored daily so we can draw trend charts
+-- -------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS event_snapshots (
+  id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  event_id        INT UNSIGNED NOT NULL,
+  snapshot_date   DATE NOT NULL,
+  tickets_sold    INT UNSIGNED NOT NULL DEFAULT 0,
+  revenue         DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  checked_in      INT UNSIGNED NOT NULL DEFAULT 0,
+  checked_out     INT UNSIGNED NOT NULL DEFAULT 0,
+  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+  UNIQUE KEY uq_event_snapshot (event_id, snapshot_date)
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_categories_event ON event_categories(event_id, sort_order);

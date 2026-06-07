@@ -7,17 +7,24 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import authRoutes from './routes/auth.js';
-import eventRoutes from './routes/events.js';
-import ticketRoutes from './routes/tickets.js';
-import attendanceRoutes from './routes/attendance.js';
-import tagRoutes from './routes/tags.js';
-import galleryRoutes from './routes/gallery.js';
-import emailRoutes from './routes/email.js';
-import participantRoutes from './routes/participants.js';
+dotenv.config();
 
-import { errorHandler } from './middleware/errorHandler.js';
-import { notFound } from './middleware/errorHandler.js';
+import { validateEnv } from './utils/validateEnv.js';
+if (process.env.NODE_ENV !== 'test') validateEnv();
+
+import authRoutes        from './routes/auth.js';
+import eventRoutes       from './routes/events.js';
+import ticketRoutes      from './routes/tickets.js';
+import attendanceRoutes  from './routes/attendance.js';
+import tagRoutes         from './routes/tags.js';
+import galleryRoutes     from './routes/gallery.js';
+import emailRoutes       from './routes/email.js';
+import participantRoutes from './routes/participants.js';
+import scheduleRoutes    from './routes/schedule.js';
+import categoryRoutes    from './routes/categories.js';
+import reportsRoutes     from './routes/reports.js';
+
+import { errorHandler, notFound } from './middleware/errorHandler.js';
 
 dotenv.config();
 
@@ -94,6 +101,17 @@ app.use('/api/tags', tagRoutes);
 app.use('/api/gallery', galleryRoutes);
 app.use('/api/email', emailRoutes);
 app.use('/api/participants', participantRoutes);
+app.use('/api', scheduleRoutes);
+app.use('/api', categoryRoutes);
+app.use('/api', reportsRoutes);
+
+// Clone event (standalone)
+import { cloneEvent } from './controllers/cloneController.js';
+app.post('/api/events/clone',
+  (await import('./middleware/auth.js')).authenticate,
+  (await import('./middleware/auth.js')).authorize('super_admin','admin'),
+  cloneEvent
+);
 
 // ─── Error Handling ──────────────────────────────────────────
 app.use(notFound);

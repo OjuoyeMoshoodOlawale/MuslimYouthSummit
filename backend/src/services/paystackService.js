@@ -1,63 +1,56 @@
+/**
+ * paystackService.js
+ * All Paystack API calls. Keys read from environment — NEVER hardcoded.
+ */
 import axios from 'axios';
 import crypto from 'crypto';
 
-const PAYSTACK_BASE = 'https://api.paystack.co';
-const SECRET = () => process.env.PAYSTACK_SECRET_KEY;
+const BASE = 'https://api.paystack.co';
 
-const paystackAxios = axios.create({
-  baseURL: PAYSTACK_BASE,
+/** Build an authenticated axios instance fresh per call (reads latest env) */
+const ps = () => axios.create({
+  baseURL: BASE,
   headers: {
     Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
     'Content-Type': 'application/json',
   },
+  timeout: 15_000,
 });
 
 /**
  * Initialize a Paystack transaction
- * @param {Object} opts
- * @returns {Promise<{authorization_url, access_code, reference}>}
  */
 export const initializeTransaction = async ({ email, amount, reference, metadata, callback_url }) => {
-  const { data } = await paystackAxios.post('/transaction/initialize', {
+  const { data } = await ps().post('/transaction/initialize', {
     email,
-    amount, // in kobo
+    amount,   // in kobo
     reference,
     metadata,
     callback_url: callback_url || process.env.PAYMENT_CALLBACK_URL,
   });
-
-  if (!data.status) {
-    throw new Error(data.message || 'Paystack transaction initialization failed.');
-  }
-
+  if (!data.status) throw new Error(data.message || 'Paystack init failed.');
   return data.data;
 };
 
 /**
  * Verify a Paystack transaction
- * @param {string} reference
- * @returns {Promise<Object>} transaction data
  */
 export const verifyTransaction = async (reference) => {
-  const { data } = await paystackAxios.get(`/transaction/verify/${reference}`);
-
-  if (!data.status) {
-    throw new Error(data.message || 'Paystack transaction verification failed.');
-  }
-
+  const { data } = await ps().get(`/transaction/verify/${encodeURIComponent(reference)}`);
+  if (!data.status) throw new Error(data.message || 'Paystack verification failed.');
   return data.data;
 };
 
 /**
- * Verify Paystack webhook signature
- * @param {string} body - raw request body string
- * @param {string} signature - x-paystack-signature header
- * @returns {boolean}
+ * Verify HMAC-SHA512 webhook signature
+ * @param {Buffer|string} rawBody - express.raw() body
+ * @param {string} signature     - x-paystack-signature header
  */
-export const verifyWebhookSignature = (body, signature) => {
-  const hash = crypto
-    .createHmac('sha512', process.env.PAYSTACK_WEBHOOK_SECRET || SECRET())
-    .update(body)
+export const verifyWebhookSignature = (rawBody, signature) => {
+  const secret = process.env.PAYSTACK_WEBHOOK_SECRET;
+  if (!secret) return false;
+  const hash = crypto.createHmac('sha512', secret)
+    .update(rawBody)
     .digest('hex');
   return hash === signature;
 };

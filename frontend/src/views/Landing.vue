@@ -138,27 +138,18 @@
       </div>
     </section>
 
-    <!-- ── SCHEDULE ────────────────────────────────────────── -->
+    <!-- ── PROGRAMME (Schedule) ────────────────────────────────── -->
     <section v-if="eventStore.hasActiveEvent" id="schedule" class="py-24 bg-brand-cream">
       <div class="max-w-7xl mx-auto px-6">
-        <div class="text-center mb-14">
-          <p class="text-brand-gold font-bold text-xs uppercase tracking-[0.3em] mb-3">Programme</p>
-          <h2 class="font-display font-bold text-4xl text-brand-green">Event Schedule</h2>
+        <div class="text-center mb-12">
+          <p class="text-brand-gold font-bold text-xs uppercase tracking-[0.3em] mb-3">Event Programme</p>
+          <h2 class="font-display font-bold text-4xl text-brand-green">Full Schedule</h2>
+          <p class="text-gray-500 mt-2 text-sm">{{ eventStore.activeEvent?.venue }}</p>
         </div>
-        <div class="max-w-3xl mx-auto space-y-3" v-if="lectures.length">
-          <div v-for="(lec, i) in lectures" :key="lec.id"
-            class="bg-white border border-gray-100 p-5 flex gap-5 hover:border-brand-gold transition-colors">
-            <div class="text-center w-20 flex-shrink-0">
-              <p class="text-brand-gold font-bold text-sm">{{ lec.start_time || '—' }}</p>
-              <p class="text-xs text-gray-300 mt-1 font-semibold uppercase">{{ lec.lecture_type }}</p>
-            </div>
-            <div class="flex-1">
-              <h3 class="font-display font-bold text-brand-green">{{ lec.title }}</h3>
-              <p v-if="lec.description" class="text-sm text-gray-500 mt-1">{{ lec.description }}</p>
-            </div>
-          </div>
-        </div>
-        <p v-else class="text-center text-gray-400">Schedule will be announced soon.</p>
+        <ProgrammeTable :schedule="lectures" :days="eventDays" />
+        <p v-if="!lectures.length" class="text-center text-gray-400 text-sm mt-6">
+          Schedule will be announced soon — check back later.
+        </p>
       </div>
     </section>
 
@@ -252,11 +243,12 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useEventStore } from '@/stores/eventStore.js';
-import CountdownTimer from '@/components/landing/CountdownTimer.vue';
-import SpeakerCard   from '@/components/landing/SpeakerCard.vue';
-import TicketCard    from '@/components/landing/TicketCard.vue';
-import GalleryMasonry from '@/components/landing/GalleryMasonry.vue';
-import { useRouter } from 'vue-router';
+import CountdownTimer  from '@/components/landing/CountdownTimer.vue';
+import SpeakerCard     from '@/components/landing/SpeakerCard.vue';
+import TicketCard      from '@/components/landing/TicketCard.vue';
+import GalleryMasonry  from '@/components/landing/GalleryMasonry.vue';
+import ProgrammeTable  from '@/components/landing/ProgrammeTable.vue';
+import { useRouter }   from 'vue-router';
 import api from '@/composables/useApi.js';
 
 const router     = useRouter();
@@ -264,6 +256,7 @@ const eventStore = useEventStore();
 const scrolled   = ref(false);
 const gallery    = ref([]);
 const lectures   = ref([]);
+const eventDays  = ref([]);
 const pastEvents = ref([]);
 
 const navLinks = [
@@ -283,12 +276,15 @@ onMounted(async () => {
   if (eventStore.hasActiveEvent) {
     const eid = eventStore.activeEvent.id;
     try {
-      const [galRes, lecRes] = await Promise.all([
+      const [galRes, lecRes, dayRes] = await Promise.all([
         api.get(`/gallery/${eid}`),
-        api.get(`/events/${eid}/lectures`),
+        api.get(`/events/${eid}/schedule`),
+        api.get(`/events/${eid}/days`),
       ]);
       gallery.value  = galRes.data.data || [];
-      lectures.value = lecRes.data.data || [];
+      const schData  = lecRes.data.data;
+      lectures.value = Array.isArray(schData) ? schData : (schData?.lectures || []);
+      eventDays.value = dayRes.data.data || [];
     } catch {}
   }
 });

@@ -91,6 +91,23 @@
               </div>
             </div>
 
+            <!-- Category assignment (if event has categories) -->
+            <div v-if="categories.length">
+              <label class="label">Category / Division <span class="text-xs text-gray-400">(assigned at registration)</span></label>
+              <div class="grid grid-cols-2 gap-2">
+                <label v-for="c in categories" :key="c.id"
+                  class="flex items-center gap-2 border-2 p-3 cursor-pointer transition-all"
+                  :class="form.category_id === c.id
+                    ? 'border-brand-green bg-brand-cream'
+                    : 'border-gray-100 hover:border-gray-300'">
+                  <input type="radio" v-model="form.category_id" :value="c.id" class="accent-brand-green" />
+                  <span class="w-2.5 h-2.5 rounded-sm flex-shrink-0" :style="{ backgroundColor: c.color }"></span>
+                  <span class="text-sm font-medium">{{ c.name }}</span>
+                  <span v-if="c.capacity" class="text-xs text-gray-400 ml-auto">{{ c.capacity - (c.registered_count||0) }} left</span>
+                </label>
+              </div>
+            </div>
+
             <p v-if="serverError" class="text-red-600 text-sm bg-red-50 border border-red-100 px-4 py-3">
               {{ serverError }}
             </p>
@@ -132,12 +149,21 @@ const serverError = ref('');
 const form = reactive({
   name:'', email:'', phone:'', gender:'', occupation:'',
   ticket_type_id: route.query.type ? Number(route.query.type) : null,
+  category_id: null,
 });
 const errs = reactive({ name:'', email:'', phone:'' });
+
+const categories  = ref([]);
 
 onMounted(async () => {
   await eventStore.fetchActiveEvent();
   loading.value = false;
+  if (eventStore.activeEvent) {
+    try {
+      const { data } = await api.get(`/events/${eventStore.activeEvent.id}/categories`);
+      categories.value = (data.data || []).filter(c => c.is_active);
+    } catch {}
+  }
 });
 
 const isEarlyBird = computed(() =>

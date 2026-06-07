@@ -18,15 +18,22 @@
           class="btn-green text-xs" @click="setStatus('active')">🟢 Activate</button>
         <button v-if="event.status === 'active'"
           class="btn-outline text-xs" @click="setStatus('completed')">Complete Event</button>
+        <button class="btn-outline text-xs border-brand-gold text-brand-gold hover:bg-brand-gold hover:text-brand-green"
+          @click="cloneDialog = true">📋 Clone Event</button>
       </div>
     </div>
 
     <!-- Tabs -->
-    <div class="border-b border-gray-200 flex gap-6 text-sm">
+    <div class="border-b border-gray-200 flex gap-6 text-sm flex-wrap">
       <button v-for="tab in tabs" :key="tab.id"
         class="pb-3 font-semibold border-b-2 transition-colors"
         :class="activeTab === tab.id ? 'border-brand-green text-brand-green' : 'border-transparent text-gray-500 hover:text-gray-700'"
         @click="activeTab = tab.id">{{ tab.label }}</button>
+      <!-- Direct link to full schedule editor -->
+      <RouterLink :to="`/admin/events/${id}/schedule`"
+        class="pb-3 font-semibold border-b-2 border-transparent text-brand-gold hover:text-yellow-600 ml-auto text-xs flex items-center gap-1">
+        ⊞ Full Schedule Editor →
+      </RouterLink>
     </div>
 
     <!-- Overview tab -->
@@ -100,8 +107,44 @@
     <div class="w-8 h-8 border-4 border-brand-green/30 border-t-brand-green rounded-full animate-spin"></div>
   </div>
 
-  <!-- Speaker modal -->
-  <AppModal v-model="speakerModal" title="Add Speaker" size="md">
+  <!-- Clone modal -->
+  <AppModal v-model="cloneDialog" title="Clone This Event" size="md">
+    <div class="space-y-4">
+      <p class="text-sm text-gray-500">
+        Creates a new draft event copying the ticket types, categories, days, and entire schedule.
+        Specify new dates for the next edition.
+      </p>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="col-span-2">
+          <label class="label">New Title</label>
+          <input v-model="cloneForm.title" class="input text-sm" :placeholder="event?.title" />
+        </div>
+        <div>
+          <label class="label">New Edition Code</label>
+          <input v-model="cloneForm.edition" class="input text-sm" placeholder="MYS4" />
+        </div>
+        <div>
+          <label class="label">Day Offset (days)</label>
+          <input v-model.number="cloneForm.shift_days" type="number" class="input text-sm" placeholder="365" />
+          <p class="text-xs text-gray-400 mt-1">Shift all dates by this many days</p>
+        </div>
+        <div>
+          <label class="label">New Start Date</label>
+          <input v-model="cloneForm.start_date" type="date" class="input text-sm" />
+        </div>
+        <div>
+          <label class="label">New End Date</label>
+          <input v-model="cloneForm.end_date" type="date" class="input text-sm" />
+        </div>
+      </div>
+      <div class="flex gap-2 pt-2">
+        <button class="btn-green text-xs" :disabled="cloning" @click="doClone">
+          {{ cloning ? 'Cloning…' : '📋 Clone Now' }}
+        </button>
+        <button class="btn-ghost text-xs" @click="cloneDialog = false">Cancel</button>
+      </div>
+    </div>
+  </AppModal>
     <form class="space-y-4" @submit.prevent="addSpeaker">
       <div><label class="label">Name *</label><input v-model="spk.name" class="input" /></div>
       <div><label class="label">Title / Position</label><input v-model="spk.title" class="input" placeholder="Sheikh, Dr., CEO…" /></div>
@@ -144,12 +187,13 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useAlertStore } from '@/stores/alertStore.js';
 import AppModal from '@/components/common/AppModal.vue';
 import api from '@/composables/useApi.js';
 
 const route  = useRoute();
+const router = useRouter();
 const alert  = useAlertStore();
 const id     = route.params.id;
 
@@ -208,7 +252,24 @@ const setStatus = async (status) => {
   catch (err) { alert.error(err.response?.data?.message || 'Failed.'); }
 };
 
-const addSpeaker = async () => {
+const cloneDialog = ref(false);
+const cloning     = ref(false);
+const cloneForm   = reactive({ title:'', edition:'', shift_days:365, start_date:'', end_date:'' });
+
+const doClone = async () => {
+  cloning.value = true;
+  try {
+    const { data } = await api.post('/events/clone', {
+      sourceEventId: id,
+      ...cloneForm,
+      shift_days: cloneForm.shift_days || 0,
+    });
+    alert.success(`Event cloned! Redirecting to new event…`);
+    cloneDialog.value = false;
+    setTimeout(() => router.push(`/admin/events/${data.data.id}`), 1000);
+  } catch (err) { alert.error(err.response?.data?.message || 'Clone failed.'); }
+  finally { cloning.value = false; }
+};
   saving.value = true;
   try {
     await api.post(`/events/${id}/speakers`, spk);
