@@ -5,16 +5,20 @@
     <nav class="fixed top-0 inset-x-0 z-50 transition-all duration-500"
       :class="scrolled ? 'bg-brand-green/96 backdrop-blur-md shadow-lg' : 'bg-transparent'">
       <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-        <img src="/logos/logo-white.png" alt="MYS" class="h-9" />
+        <button @click="scrollTo('top')" class="flex items-center">
+          <img src="/logos/logo-white.png" alt="MYS" class="h-9" />
+        </button>
         <div class="hidden md:flex items-center gap-7 text-white/80 text-sm font-semibold">
-          <a v-for="l in navLinks" :key="l.href" :href="l.href"
-            class="hover:text-brand-gold transition-colors duration-200">{{ l.label }}</a>
+          <button v-for="l in navLinks" :key="l.id"
+            class="hover:text-brand-gold transition-colors duration-200"
+            @click="scrollTo(l.id)">{{ l.label }}</button>
         </div>
         <div class="flex items-center gap-2">
-          <a v-if="eventStore.hasActiveEvent" href="#tickets"
-            class="btn-gold text-xs py-2 px-4 hidden md:inline-flex">
-            <Ticket :size="13" /> Buy Ticket
-          </a>
+          <button v-if="eventStore.hasActiveEvent"
+            class="btn-gold text-xs py-2 px-4 hidden md:inline-flex"
+            @click="scrollTo('tickets')">
+            <Ticket :size="13" /> Register for Ticket
+          </button>
           <a href="/admin/login" class="text-white/40 hover:text-white/80 transition-colors ml-2">
             <Lock :size="15" />
           </a>
@@ -106,24 +110,24 @@
           style="transition: all 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.25s">
           <template v-if="eventStore.hasActiveEvent">
             <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mt-2">
-              <a href="#tickets"
-                class="btn-gold text-sm px-10 py-4 w-full sm:w-auto justify-center text-center">
-                <Ticket :size="18" /> Register &amp; Buy Ticket
-              </a>
-              <a href="#schedule"
-                class="btn-white text-sm px-10 py-4 w-full sm:w-auto justify-center">
+              <button class="btn-gold text-sm px-10 py-4 w-full sm:w-auto justify-center"
+                @click="scrollTo('tickets')">
+                <Ticket :size="18" /> Register for Ticket
+              </button>
+              <button class="btn-white text-sm px-10 py-4 w-full sm:w-auto justify-center"
+                @click="scrollTo('schedule')">
                 <CalendarCheck :size="18" /> View Programme
-              </a>
+              </button>
             </div>
           </template>
           <template v-else>
             <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mt-2">
-              <a href="#about" class="btn-gold text-sm px-10 py-4">
+              <button class="btn-gold text-sm px-10 py-4" @click="scrollTo('about')">
                 <Sparkles :size="18" /> About the Summit
-              </a>
-              <a href="#past-events" class="btn-white text-sm px-10 py-4">
+              </button>
+              <button class="btn-white text-sm px-10 py-4" @click="scrollTo('past-events')">
                 <History :size="18" /> Past Editions
-              </a>
+              </button>
             </div>
           </template>
         </div>
@@ -214,9 +218,9 @@
             </p>
             <h2 class="font-display font-bold text-4xl text-brand-green">Full Schedule</h2>
           </div>
-          <a href="#tickets" class="btn-green text-xs hidden md:inline-flex">
+          <button class="btn-green text-xs hidden md:inline-flex" @click="scrollTo('tickets')">
             <Ticket :size="13" /> Secure Your Spot
-          </a>
+          </button>
         </div>
         <ProgrammeTable :schedule="lectures" :days="eventDays" />
         <p v-if="!lectures.length" class="text-center text-gray-400 text-sm mt-6">
@@ -321,15 +325,18 @@
             <div>
               <p class="text-brand-gold font-bold text-xs uppercase tracking-wider mb-3">Navigate</p>
               <div class="space-y-2">
-                <a v-for="l in navLinks" :key="l.href" :href="l.href"
-                  class="block text-white/55 hover:text-brand-gold transition-colors text-sm">{{ l.label }}</a>
+                <button v-for="l in navLinks" :key="l.id"
+                  class="block text-white/55 hover:text-brand-gold transition-colors text-sm text-left"
+                  @click="scrollTo(l.id)">{{ l.label }}</button>
               </div>
             </div>
             <div>
               <p class="text-brand-gold font-bold text-xs uppercase tracking-wider mb-3">Quick Links</p>
               <div class="space-y-2 text-sm">
                 <RouterLink to="/past-events" class="block text-white/55 hover:text-brand-gold transition-colors">Past Events</RouterLink>
-                <a v-if="eventStore.hasActiveEvent" href="#tickets" class="block text-white/55 hover:text-brand-gold transition-colors">Buy Ticket</a>
+                <button v-if="eventStore.hasActiveEvent"
+                  class="block text-white/55 hover:text-brand-gold transition-colors text-left text-sm"
+                  @click="scrollTo('tickets')">Register for Ticket</button>
                 <a href="/admin/login" class="block text-white/55 hover:text-brand-gold transition-colors">Admin Portal</a>
               </div>
             </div>
@@ -373,12 +380,21 @@ const pastEvents  = ref([]);
 const heroStep    = ref(0);
 
 const navLinks = [
-  { href:'#about',       label:'About'      },
-  { href:'#speakers',    label:'Speakers'   },
-  { href:'#schedule',    label:'Programme'  },
-  { href:'#tickets',     label:'Tickets'    },
-  { href:'#past-events', label:'Past Editions' },
+  { id:'about',       label:'About'         },
+  { id:'speakers',    label:'Speakers'      },
+  { id:'schedule',    label:'Programme'     },
+  { id:'tickets',     label:'Tickets'       },
+  { id:'past-events', label:'Past Editions' },
 ];
+
+const scrollTo = (id) => {
+  if (id === 'top') { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  const el = document.getElementById(id);
+  if (!el) return;
+  const offset = 70; // nav height
+  const top = el.getBoundingClientRect().top + window.scrollY - offset;
+  window.scrollTo({ top, behavior: 'smooth' });
+};
 
 const aboutStats = [
   { value:'3+',   label:'Editions',  delay:'reveal-delay-1' },
