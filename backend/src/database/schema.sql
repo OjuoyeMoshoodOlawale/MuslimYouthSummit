@@ -205,6 +205,11 @@ CREATE TABLE IF NOT EXISTS tickets (
   qr_code_svg        MEDIUMTEXT NULL
                      COMMENT 'Rendered SVG QR code',
   amount_paid        DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  balance_due        DECIMAL(10,2) NOT NULL DEFAULT 0.00
+                     COMMENT 'Outstanding balance for partial payments',
+  payment_method     ENUM('paystack','cash','bank_transfer','pos','waived','other')
+                     NULL COMMENT 'How the ticket was paid for',
+  payment_note       TEXT NULL COMMENT 'Reference, receipt number, or payment notes',
   paystack_reference VARCHAR(100) UNIQUE NULL,
   status             ENUM('pending','paid','cancelled') NOT NULL DEFAULT 'pending',
   is_early_bird      TINYINT(1) NOT NULL DEFAULT 0,

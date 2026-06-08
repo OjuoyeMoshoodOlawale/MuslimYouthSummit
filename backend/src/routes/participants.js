@@ -1,46 +1,91 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { query } from '../database/db.js';
-import { success, paginated, buildPagination } from '../utils/response.js';
+import { paginated, buildPagination, success } from '../utils/response.js';
 import { parsePagination } from '../utils/helpers.js';
 
 const router = express.Router();
+const adm = [authenticate, authorize('super_admin','admin')];
 
-router.get('/', authenticate, authorize('super_admin', 'admin'), async (req, res, next) => {
+/* ── List participants with filters ─────────────────────────── */
+router.get('/participants', authenticate, async (req, res, next) => {
   try {
     const { page, limit, offset } = parsePagination(req.query);
-    const { search, subscribed } = req.query;
-    let sql = 'SELECT * FROM participants WHERE 1=1';
+    const { search, event_id, category_id, checked_in } = req.query;
+
+    let joins = `
+      LEFT JOIN tickets t       ON t.participant_id = p.id
+      LEFT JOIN ticket_types tt ON tt.id = t.ticket_type_id
+      LEFT JOIN event_categories c ON c.id = t.category_id
+      LEFT JOIN attendance a    ON a.ticket_id = t.id
+    `;
+    let where = "WHERE t.status = 'paid'";
     const params = [];
-    if (search) { sql += ' AND (name LIKE ? OR email LIKE ? OR phone LIKE ?)'; const s = `%${search}%`; params.push(s,s,s); }
-    if (subscribed !== undefined) { sql += ' AND email_subscribed = ?'; params.push(subscribed === 'true' ? 1 : 0); }
-    const [[{ total }]] = await query(`SELECT COUNT(*) AS total FROM participants WHERE 1=1${search ? ' AND (name LIKE ? OR email LIKE ? OR phone LIKE ?)' : ''}${subscribed !== undefined ? ' AND email_subscribed = ?' : ''}`, params);
-    const [rows] = await query(sql + ' ORDER BY created_at DESC LIMIT ? OFFSET ?', [...params, limit, offset]);
+
+    if (event_id)   { where += ' AND t.event_id = ?';    params.push(event_id); }
+    if (category_id){ where += ' AND t.category_id = ?'; params.push(category_id); }
+    if (checked_in === '1') { where += ' AND a.checked_in_at IS NOT NULL'; }
+    if (checked_in === '0') { where += ' AND (a.checked_in_at IS NULL OR a.id IS NULL)'; }
+    if (search) {
+      where += ' AND (p.name LIKE ? OR p.email LIKE ? OR p.phone LIKE ? OR t.unique_number LIKE ?)';
+      const q = `%${search}%`;
+      params.push(q, q, q, q);
+    }
+
+    const [[{ total }]] = await query(
+      `SELECT COUNT(DISTINCT p.id) AS total FROM participants p ${joins} ${where}`, params
+    );
+
+    const [rows] = await query(
+      `SELECT
+         p.id, p.name, p.email, p.phone, p.gender,
+         t.id AS ticket_id, t.unique_number, t.amount_paid, t.balance_due,
+         t.payment_method, t.event_id, t.category_id,
+         tt.name AS ticket_type_name,
+         c.name  AS category_name, c.color AS category_color,
+         a.checked_in_at, a.checked_out_at, a.id AS attendance_id
+       FROM participants p ${joins} ${where}
+       ORDER BY p.created_at DESC LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+
     paginated(res, rows, buildPagination(total, page, limit, rows.length));
-  } catch (err) { next(err); }
+  } catch (e) { next(e); }
 });
 
-router.get('/:id', authenticate, authorize('super_admin', 'admin'), async (req, res, next) => {
+/* ── Get single participant ─────────────────────────────────── */
+router.get('/participants/:id', ...adm, async (req, res, next) => {
   try {
     const [rows] = await query(
       `SELECT p.*, 
-        JSON_ARRAYAGG(JSON_OBJECT('event', e.title, 'ticket', t.unique_number, 'purchased_at', t.purchased_at)) AS event_history
+              JSON_ARRAYAGG(
+                JSON_OBJECT('event', e.title, 'ticket', t.unique_number,
+                            'amount', t.amount_paid, 'status', t.status,
+                            'date', t.purchased_at)
+              ) AS ticket_history
        FROM participants p
-       LEFT JOIN tickets t ON t.participant_id = p.id AND t.status = 'paid'
-       LEFT JOIN events e ON e.id = t.event_id
-       WHERE p.id = ? GROUP BY p.id`,
+       LEFT JOIN tickets t ON t.participant_id = p.id
+       LEFT JOIN events e  ON e.id = t.event_id
+       WHERE p.id = ?
+       GROUP BY p.id`,
       [req.params.id]
     );
-    if (!rows.length) return res.status(404).json({ success: false, message: 'Participant not found.' });
+    if (!rows.length) return res.status(404).json({ success:false, message:'Not found.' });
     success(res, rows[0]);
-  } catch (err) { next(err); }
+  } catch (e) { next(e); }
 });
 
-router.delete('/:id/unsubscribe', authenticate, authorize('super_admin', 'admin'), async (req, res, next) => {
+/* ── Tag validation for check-in ───────────────────────────── */
+router.get('/tags/validate', authenticate, async (req, res, next) => {
   try {
-    await query('UPDATE participants SET email_subscribed = 0 WHERE id = ?', [req.params.id]);
-    success(res, null, 'Participant unsubscribed from email communications.');
-  } catch (err) { next(err); }
+    const { tag, event_id } = req.query;
+    if (!tag) return success(res, { available: true });
+    const [rows] = await query(
+      "SELECT id FROM event_tags WHERE tag_number = ? AND event_id = ? AND ticket_id IS NOT NULL",
+      [tag.toUpperCase(), event_id]
+    );
+    success(res, { available: rows.length === 0, tag: tag.toUpperCase() });
+  } catch (e) { next(e); }
 });
 
 export default router;

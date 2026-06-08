@@ -117,8 +117,34 @@ export const assignTagAndCheckIn = async (req, res, next) => {
     }
 
     const tagMsg = tag_number ? ` Tag ${tag_number.toUpperCase()} assigned.` : '';
-    return success(res, { tag_number, ticket_id },
-      `✅ Check-in complete!${tagMsg}`);
+
+    // Send check-in email (non-blocking)
+    try {
+      const [parts] = await query(
+        `SELECT p.name, p.email, e.title AS event_title, e.venue
+         FROM participants p
+         JOIN tickets t ON t.id = ?
+         JOIN events e  ON e.id = ?
+         WHERE p.id = t.participant_id`,
+        [ticket_id, event_id]
+      );
+      if (parts.length && parts[0].email) {
+        const { sendCampaignEmail } = await import('../services/emailService.js');
+        sendCampaignEmail({
+          to:      parts[0].email,
+          subject: `✅ You're checked in — ${parts[0].event_title}`,
+          html: `<div style="font-family:sans-serif;max-width:520px;padding:24px;background:#FBF6E6">
+            <img src="https://muslimyouthsummit.com/logos/logo-black.png" style="height:40px;margin-bottom:16px" alt="MYS"/>
+            <h2 style="color:#02462E;margin:0 0 8px">Assalamu Alaikum, ${parts[0].name}!</h2>
+            <p style="color:#444">You have been successfully checked in to <strong>${parts[0].event_title}</strong>${parts[0].venue ? ` at ${parts[0].venue}` : ''}.</p>
+            ${tag_number ? `<p style="color:#555;margin:8px 0">Your event tag: <strong style="color:#02462E">${tag_number.toUpperCase()}</strong></p>` : ''}
+            <p style="color:#888;font-size:13px;margin-top:20px">JazakAllahu Khayran for attending. Have a blessed experience!</p>
+          </div>`,
+        }).catch(() => {});
+      }
+    } catch {}
+
+    return success(res, { tag_number, ticket_id }, `Check-in complete!${tagMsg}`);
   } catch (e) { next(e); }
 };
 

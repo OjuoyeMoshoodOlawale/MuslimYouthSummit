@@ -111,7 +111,7 @@ export const getEventSchedule = async (req, res, next) => {
        LEFT JOIN speakers s ON s.id = ls.speaker_id
        WHERE l.event_id = ?
        GROUP BY l.id
-       ORDER BY l.day_id, l.sort_order, l.start_time`,
+       ORDER BY l.event_day_id, l.sort_order, l.start_time`,
       [id]
     );
 
@@ -514,7 +514,7 @@ async function enrichEvent(eventId, event) {
      LEFT JOIN lecture_speakers ls ON ls.lecture_id = l.id
      LEFT JOIN speakers s ON s.id = ls.speaker_id
      WHERE l.event_id = ?
-     GROUP BY l.id ORDER BY l.day_id, l.sort_order, l.start_time`,
+     GROUP BY l.id ORDER BY l.event_day_id, l.sort_order, l.start_time`,
     [eventId]
   );
 
@@ -524,12 +524,20 @@ async function enrichEvent(eventId, event) {
   );
 
   const [ticketTypes] = await query(
-    'SELECT * FROM ticket_types WHERE event_id = ? AND is_active = 1 ORDER BY regular_price',
+    `SELECT *, CASE
+       WHEN early_bird_price IS NOT NULL AND early_bird_price > 0 THEN 1
+       ELSE 0 END AS has_early_bird
+     FROM ticket_types WHERE event_id = ? AND is_active = 1
+     ORDER BY sort_order, participant_category, regular_price`,
     [eventId]
   );
 
   const [[stats]] = await query(
-    `SELECT COUNT(*) AS total_sold FROM tickets WHERE event_id = ? AND status = 'paid'`,
+    `SELECT
+       COUNT(*) AS total_sold,
+       SUM(amount_paid) AS total_revenue,
+       SUM(CASE WHEN balance_due > 0 THEN 1 ELSE 0 END) AS partial_payments
+     FROM tickets WHERE event_id = ? AND status = 'paid'`,
     [eventId]
   );
 

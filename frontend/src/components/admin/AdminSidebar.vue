@@ -55,8 +55,13 @@ import { useAuthStore } from '@/stores/authStore.js';
 import {
   LayoutDashboard, TrendingUp, FileBarChart2, CalendarDays, Tag, ShieldCheck,
   Ticket, Image, Users, Mail, Key, ChevronLeft, ChevronRight, LogOut, Tags,
-  UserPlus, BedDouble, Building2, ReceiptText,
+  UserPlus, BedDouble, Building2, ReceiptText, Settings,
 } from 'lucide-vue-next';
+
+const ALL_ADMIN  = ['super_admin','admin','attendant','department'];
+const ADMIN_ONLY = ['super_admin','admin'];
+const SUPER_ONLY = ['super_admin'];
+const DEPT_PLUS  = ['super_admin','admin','department'];
 
 defineProps({ collapsed: { type: Boolean, default: false } });
 defineEmits(['toggle']);
@@ -103,9 +108,10 @@ const allSections = [
   {
     label: 'System',
     links: [
-      { to:'/admin/departments', label:'Departments',      icon:Building2, roles:['super_admin','admin'] },
-      { to:'/admin/expenses',    label:'Expense Requests', icon:ReceiptText, roles:['super_admin','admin','department'] },
-      { to:'/admin/admins',      label:'Admin Users',      icon:Key,       roles:['super_admin'] },
+      { to:'/admin/departments', label:'Departments',      icon:Building2,   roles:ADMIN_ONLY },
+      { to:'/admin/expenses',    label:'Expense Requests', icon:ReceiptText,  roles:DEPT_PLUS  },
+      { to:'/admin/admins',      label:'Admin Users',      icon:Key,          roles:SUPER_ONLY },
+      { to:'/admin/settings',    label:'My Settings',      icon:Settings,     roles:ALL_ADMIN  },
     ],
   },
 ];

@@ -29,6 +29,7 @@ const AdminManualRegister = () => import('@/views/admin/AdminManualRegister.vue'
 const AdminHostels        = () => import('@/views/admin/AdminHostels.vue');
 const AdminDepartments    = () => import('@/views/admin/AdminDepartments.vue');
 const AdminExpenses       = () => import('@/views/admin/AdminExpenses.vue');
+const AdminSettings       = () => import('@/views/admin/AdminSettings.vue');
 
 /* ─── Roles shorthand ────────────────────────────────────── */
 const ALL_ADMIN  = ['super_admin','admin','attendant','department'];
@@ -110,6 +111,8 @@ const routes = [
       /* System */
       { path: 'admins',              name: 'admin-admins',          component: AdminAdmins,
         meta: { roles: SUPER_ONLY } },
+      { path: 'settings',            name: 'admin-settings',        component: AdminSettings,
+        meta: { roles: ALL_ADMIN } },
     ],
   },
 
