@@ -111,12 +111,17 @@ CREATE TABLE IF NOT EXISTS lecture_speakers (
 CREATE TABLE IF NOT EXISTS ticket_types (
   id                    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   event_id              INT UNSIGNED NOT NULL,
-  name                  VARCHAR(100) NOT NULL COMMENT 'e.g. Regular, VIP',
+  name                  VARCHAR(100) NOT NULL COMMENT 'e.g. Regular – Undergraduate, VIP',
+  participant_category  ENUM('all','undergraduate','graduate','professional','other')
+                        NOT NULL DEFAULT 'all'
+                        COMMENT 'Who this type is for — shown on registration form',
+  description           VARCHAR(200) COMMENT 'e.g. For 100–400 level students only',
   regular_price         DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   early_bird_price      DECIMAL(10,2),
   quantity_available    INT UNSIGNED COMMENT 'NULL = unlimited',
   quantity_sold         INT UNSIGNED NOT NULL DEFAULT 0,
   is_active             TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order            TINYINT UNSIGNED NOT NULL DEFAULT 0,
   created_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
@@ -376,3 +381,15 @@ CREATE TABLE IF NOT EXISTS facilitator_reminders (
 
 CREATE INDEX idx_hostels_active  ON hostels(is_active, gender);
 CREATE INDEX idx_hostel_event    ON hostel_assignments(event_id, hostel_id);
+
+-- =============================================================
+-- PHASE 4: Flexible ticket type pricing
+-- =============================================================
+
+-- Add participant_category to ticket_types
+-- (for fresh installs this column is added here; existing DBs run the ALTER below)
+-- ALTER TABLE ticket_types ADD COLUMN participant_category
+--   ENUM('all','undergraduate','graduate','professional','other')
+--   NOT NULL DEFAULT 'all' AFTER name;
+-- ALTER TABLE ticket_types ADD COLUMN description VARCHAR(200) NULL AFTER participant_category;
+-- ALTER TABLE ticket_types ADD COLUMN sort_order TINYINT UNSIGNED NOT NULL DEFAULT 0;

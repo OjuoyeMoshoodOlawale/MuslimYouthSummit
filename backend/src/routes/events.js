@@ -8,7 +8,6 @@ import {
   adminListEvents, createEvent, updateEvent, changeEventStatus, deleteEvent,
   addEventDay, updateEventDay, deleteEventDay,
   addSpeaker, updateSpeaker, deleteSpeaker,
-  getTicketTypes, addTicketType, updateTicketType
 } from '../controllers/eventController.js';
 import { getSchedule, createEntry, updateEntry, deleteEntry } from '../controllers/scheduleController.js';
 
@@ -21,7 +20,7 @@ router.get('/past', getPastEvents);
 router.get('/:id', getEvent);
 router.get('/:id/schedule', getSchedule);
 router.get('/:id/speakers', getEventSpeakers);
-router.get('/:id/ticket-types', getTicketTypes);
+// Ticket types are managed via /api/events/:id/ticket-types (ticketTypes.js)
 router.get('/:id/lectures', getSchedule); // alias
 router.get('/:id/days', async (req, res, next) => {
   try {
@@ -55,7 +54,6 @@ router.put('/:id/speakers/:sid', authenticate, authorize('super_admin', 'admin')
 router.delete('/:id/speakers/:sid', authenticate, authorize('super_admin', 'admin'), deleteSpeaker);
 
 // Ticket Types
-router.post('/:id/ticket-types', authenticate, authorize('super_admin', 'admin'), addTicketType);
-router.put('/:id/ticket-types/:tid', authenticate, authorize('super_admin', 'admin'), updateTicketType);
+// (ticket type CRUD is in ticketTypes.js routes)
 
 export default router;

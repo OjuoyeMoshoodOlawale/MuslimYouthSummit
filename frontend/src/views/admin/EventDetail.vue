@@ -24,15 +24,21 @@
     </div>
 
     <!-- Tabs -->
-    <div class="border-b border-gray-200 flex gap-6 text-sm flex-wrap">
+    <div class="border-b border-gray-200 flex gap-0 text-sm flex-wrap">
       <button v-for="tab in tabs" :key="tab.id"
-        class="pb-3 font-semibold border-b-2 transition-colors"
+        class="px-5 pb-3 pt-1 font-semibold border-b-2 transition-colors"
         :class="activeTab===tab.id ? 'border-brand-green text-brand-green' : 'border-transparent text-gray-500 hover:text-gray-700'"
         @click="activeTab=tab.id">{{ tab.label }}</button>
-      <RouterLink :to="`/admin/events/${id}/schedule`"
-        class="pb-3 font-semibold border-b-2 border-transparent text-brand-gold hover:text-yellow-600 ml-auto text-xs flex items-center gap-1">
-        ⊞ Full Schedule Editor →
-      </RouterLink>
+      <div class="ml-auto flex items-center gap-3 pb-2">
+        <RouterLink :to="`/admin/events/${id}/ticket-types`"
+          class="text-xs text-brand-gold hover:text-yellow-600 flex items-center gap-1 font-semibold">
+          <Ticket :size="13" /> Manage Pricing →
+        </RouterLink>
+        <RouterLink :to="`/admin/events/${id}/schedule`"
+          class="text-xs text-brand-green hover:text-brand-green/70 flex items-center gap-1 font-semibold">
+          <CalendarCheck :size="13" /> Full Schedule →
+        </RouterLink>
+      </div>
     </div>
 
     <!-- Overview tab -->
@@ -229,6 +235,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAlertStore } from '@/stores/alertStore.js';
+import { Ticket, CalendarCheck } from 'lucide-vue-next';
 import AppModal from '@/components/common/AppModal.vue';
 import api from '@/composables/useApi.js';
 

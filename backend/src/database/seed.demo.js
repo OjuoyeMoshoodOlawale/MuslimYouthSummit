@@ -257,17 +257,22 @@ async function seed() {
   /* ── 9. Ticket types ─────────────────────────────────────── */
   console.log('\n🎟  Creating ticket types...');
   const [regTT] = await q(
-    `INSERT INTO ticket_types (event_id, name, regular_price, early_bird_price, quantity_available)
-     VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE regular_price=VALUES(regular_price)`,
-    [mys3Id, 'Regular', 5000, 3500, 200]
+    `INSERT INTO ticket_types (event_id, name, participant_category, description, regular_price, early_bird_price, quantity_available, sort_order)
+     VALUES (?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE regular_price=VALUES(regular_price)`,
+    [mys3Id, 'Regular – Undergraduate', 'undergraduate', 'For 100–400 level university students', 3000, 2000, 150, 0]
+  );
+  const [regGrad] = await q(
+    `INSERT INTO ticket_types (event_id, name, participant_category, description, regular_price, early_bird_price, quantity_available, sort_order)
+     VALUES (?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE regular_price=VALUES(regular_price)`,
+    [mys3Id, 'Regular – Graduate', 'graduate', 'For postgraduate students and recent graduates', 5000, 3500, 100, 1]
   );
   const [vipTT] = await q(
-    `INSERT INTO ticket_types (event_id, name, regular_price, early_bird_price, quantity_available)
-     VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE regular_price=VALUES(regular_price)`,
-    [mys3Id, 'VIP (With Accommodation)', 15000, 12000, 40]
+    `INSERT INTO ticket_types (event_id, name, participant_category, description, regular_price, early_bird_price, quantity_available, sort_order)
+     VALUES (?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE regular_price=VALUES(regular_price)`,
+    [mys3Id, 'VIP – With Accommodation', 'all', 'Includes 2-night hostel accommodation', 15000, 12000, 40, 2]
   );
-  const [ttRows] = await q('SELECT id FROM ticket_types WHERE event_id=? ORDER BY regular_price', [mys3Id]);
-  const [regularTT, vipTTId] = ttRows.map(t => t.id);
+  const [ttRows] = await q('SELECT id FROM ticket_types WHERE event_id=? ORDER BY sort_order', [mys3Id]);
+  const [regularTT, gradTT, vipTTId] = ttRows.map(t => t.id);
   log(`✅ Ticket types: Regular (₦5,000 / EB ₦3,500) + VIP (₦15,000 / EB ₦12,000)`);
 
   /* ── 10. Participants & Tickets ──────────────────────────── */
@@ -405,7 +410,7 @@ async function seed() {
   console.log('  • MYS2 (completed past event)');
   console.log('  • MYS3 (active event with full programme)');
   console.log('    - 4 speakers, 12 schedule entries');
-  console.log('    - 2 ticket types (Regular + VIP)');
+  console.log('    - 3 ticket types: Undergrad ₦3k/₦2k, Grad ₦5k/₦3.5k, VIP ₦15k/₦12k');
   console.log('    - 30 participants with paid tickets');
   console.log('    - 15 check-ins, hostel assignments');
   console.log('  • 1 draft email campaign');

@@ -24,6 +24,7 @@ import scheduleRoutes    from './routes/schedule.js';
 import categoryRoutes    from './routes/categories.js';
 import reportsRoutes     from './routes/reports.js';
 import hostelRoutes      from './routes/hostels.js';
+import ticketTypeRoutes  from './routes/ticketTypes.js';
 import { cloneEvent }    from './controllers/cloneController.js';
 import { authenticate, authorize } from './middleware/auth.js';
 
@@ -107,6 +108,7 @@ app.use('/api', scheduleRoutes);
 app.use('/api', categoryRoutes);
 app.use('/api', reportsRoutes);
 app.use('/api', hostelRoutes);
+app.use('/api', ticketTypeRoutes);
 app.post('/api/events/clone', authenticate, authorize('super_admin','admin'), cloneEvent);
 
 // Facilitator reminders

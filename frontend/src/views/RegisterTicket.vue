@@ -33,32 +33,65 @@
           </p>
         </div>
 
-        <!-- Ticket type picker -->
+        <!-- Ticket type picker — grouped by participant category -->
         <div class="bg-white border border-gray-100 p-5 mb-6">
-          <h2 class="font-display font-bold text-base text-brand-green mb-4">Select Ticket Type</h2>
-          <div class="space-y-3">
-            <label v-for="tt in eventStore.ticketTypes" :key="tt.id"
-              class="flex items-center justify-between p-4 border-2 cursor-pointer transition-all"
-              :class="form.ticket_type_id === tt.id ? 'border-brand-green bg-brand-cream' : 'border-gray-100 hover:border-gray-300'">
-              <div class="flex items-center gap-3">
-                <input type="radio" v-model="form.ticket_type_id" :value="tt.id" class="accent-brand-green" />
-                <div>
-                  <p class="font-semibold text-sm">{{ tt.name }}</p>
-                  <p v-if="isEarlyBird && tt.early_bird_price" class="text-xs text-brand-gold">Early Bird Active!</p>
-                </div>
-              </div>
-              <div class="text-right">
-                <p class="font-display font-bold text-lg text-brand-green">
-                  ₦{{ fmtP(isEarlyBird && tt.early_bird_price ? tt.early_bird_price : tt.regular_price) }}
-                </p>
-                <p v-if="isEarlyBird && tt.early_bird_price" class="text-xs text-gray-400 line-through">
-                  ₦{{ fmtP(tt.regular_price) }}
-                </p>
-              </div>
-            </label>
-          </div>
-        </div>
+          <h2 class="font-display font-bold text-base text-brand-green mb-1">Select Your Ticket</h2>
+          <p class="text-xs text-gray-400 mb-4 flex items-center gap-1">
+            <Info :size="11" /> Choose the option that matches your status
+          </p>
 
+          <!-- Early bird active notice -->
+          <div v-if="earlyBirdActive" class="flex items-center gap-2 bg-brand-gold/10 border border-brand-gold/30
+                text-brand-gold text-xs font-bold px-4 py-2 mb-4">
+            <Zap :size="13" />
+            Early Bird pricing is active until {{ formatDate(eventStore.activeEvent?.early_bird_closes_at) }}
+          </div>
+
+          <!-- Group by participant category -->
+          <div v-for="group in groupedTicketTypes" :key="group.category" class="mb-5 last:mb-0">
+            <p v-if="group.category !== 'all' && groupedTicketTypes.length > 1"
+              class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 flex items-center gap-1.5">
+              <GraduationCap :size="11" /> {{ group.label }}
+            </p>
+            <div class="space-y-2">
+              <label v-for="tt in group.types" :key="tt.id"
+                class="flex items-center justify-between p-4 border-2 cursor-pointer transition-all"
+                :class="form.ticket_type_id===tt.id ? 'border-brand-green bg-brand-cream' : 'border-gray-100 hover:border-brand-green/30'">
+                <div class="flex items-center gap-3">
+                  <input type="radio" v-model="form.ticket_type_id" :value="tt.id" class="accent-brand-green" />
+                  <div>
+                    <p class="font-semibold text-sm">{{ tt.name }}</p>
+                    <p v-if="tt.description" class="text-xs text-gray-400 mt-0.5">{{ tt.description }}</p>
+                    <div v-if="earlyBirdActive && tt.early_bird_price" class="flex items-center gap-1 mt-1">
+                      <Zap :size="10" class="text-brand-gold" />
+                      <span class="text-xs text-brand-gold font-semibold">Early Bird Active</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="text-right flex-shrink-0 ml-4">
+                  <p class="font-display font-bold text-xl text-brand-green">
+                    ₦{{ fmtP(earlyBirdActive && tt.early_bird_price ? tt.early_bird_price : tt.regular_price) }}
+                  </p>
+                  <div v-if="earlyBirdActive && tt.early_bird_price"
+                    class="flex items-center justify-end gap-1.5">
+                    <span class="text-xs text-gray-400 line-through">₦{{ fmtP(tt.regular_price) }}</span>
+                    <span class="text-xs text-green-600 font-bold bg-green-50 px-1.5 py-0.5">
+                      -{{ Math.round((1 - tt.early_bird_price / tt.regular_price) * 100) }}%
+                    </span>
+                  </div>
+                  <p v-if="tt.quantity_available" class="text-xs mt-1"
+                    :class="tt.quantity_available - tt.quantity_sold <= 10 ? 'text-red-500 font-semibold' : 'text-gray-400'">
+                    {{ tt.quantity_available - tt.quantity_sold }} left
+                  </p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <p v-if="!eventStore.ticketTypes.length" class="text-gray-400 text-sm text-center py-4">
+            No ticket types available.
+          </p>
+        </div>
         <!-- Personal details -->
         <div class="bg-white border border-gray-100 p-5 mb-6">
           <h2 class="font-display font-bold text-base text-brand-green mb-4">Your Details</h2>
@@ -139,7 +172,7 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useEventStore } from '@/stores/eventStore.js';
-import { Ticket, CalendarX, MapPin, CalendarDays, ShieldCheck, ArrowRight } from 'lucide-vue-next';
+import { Ticket, CalendarX, MapPin, CalendarDays, ShieldCheck, ArrowRight, Info, Zap, GraduationCap } from 'lucide-vue-next';
 import api from '@/composables/useApi.js';
 
 const router     = useRouter();
@@ -173,6 +206,32 @@ const isEarlyBird = computed(() =>
   eventStore.activeEvent?.early_bird_closes_at &&
   new Date(eventStore.activeEvent.early_bird_closes_at) > new Date()
 );
+
+// Use single computed for early bird (replaces isEarlyBird usages in template)
+const earlyBirdActive = isEarlyBird;
+
+const CATEGORY_LABELS = {
+  all:           'All Participants',
+  undergraduate: 'Undergraduate Students',
+  graduate:      'Graduate / Postgraduate',
+  professional:  'Professionals / Alumni',
+  other:         'Other',
+};
+
+// Group ticket types by participant_category for display
+const groupedTicketTypes = computed(() => {
+  const types = eventStore.ticketTypes;
+  const groups = {};
+  const order  = ['all','undergraduate','graduate','professional','other'];
+  for (const tt of types) {
+    const cat = tt.participant_category || 'all';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(tt);
+  }
+  return order
+    .filter(cat => groups[cat]?.length)
+    .map(cat => ({ category: cat, label: CATEGORY_LABELS[cat], types: groups[cat] }));
+});
 
 const selectedType = computed(() =>
   eventStore.ticketTypes.find(t => t.id === form.ticket_type_id)

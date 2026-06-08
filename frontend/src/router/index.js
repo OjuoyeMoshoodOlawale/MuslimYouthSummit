@@ -14,6 +14,7 @@ const AdminEventDashboard = () => import('@/views/admin/AdminEventDashboard.vue'
 const AdminEvents      = () => import('@/views/admin/AdminEvents.vue');
 const AdminManualRegister = () => import('@/views/admin/AdminManualRegister.vue');
 const AdminHostels        = () => import('@/views/admin/AdminHostels.vue');
+const AdminTicketTypes    = () => import('@/views/admin/AdminTicketTypes.vue');
 const CreateEvent      = () => import('@/views/admin/CreateEvent.vue');
 const EventDetail      = () => import('@/views/admin/EventDetail.vue');
 const AdminSchedule    = () => import('@/views/admin/AdminSchedule.vue');
@@ -50,7 +51,9 @@ const routes = [
         meta: { roles: ['super_admin','admin'] } },
       { path: 'events/:id',        name: 'admin-event-detail',    component: EventDetail,
         meta: { roles: ['super_admin','admin'] } },
-      { path: 'events/:id/schedule', name: 'admin-schedule',      component: AdminSchedule,
+      { path: 'events/:id/schedule',   name: 'admin-schedule',      component: AdminSchedule,
+        meta: { roles: ['super_admin','admin'] } },
+      { path: 'events/:id/ticket-types', name: 'admin-ticket-types', component: AdminTicketTypes,
         meta: { roles: ['super_admin','admin'] } },
       { path: 'categories',        name: 'admin-categories',      component: AdminCategories,
         meta: { roles: ['super_admin','admin'] } },
