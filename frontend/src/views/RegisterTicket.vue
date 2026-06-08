@@ -5,13 +5,15 @@
       <RouterLink to="/" class="flex items-center gap-3">
         <img src="/logos/logo-white.png" alt="MYS" class="h-10" />
       </RouterLink>
-      <p class="text-white/60 text-sm">Ticket Registration</p>
+      <p class="text-white/60 text-sm flex items-center gap-2">
+        <Ticket :size="14" /> Ticket Registration
+      </p>
     </div>
 
     <div class="max-w-xl mx-auto px-6 py-12">
       <!-- No active event -->
       <div v-if="!eventStore.hasActiveEvent && !loading" class="text-center py-20">
-        <p class="text-4xl mb-4">📅</p>
+        <CalendarX :size="48" class="text-gray-300 mx-auto mb-4" />
         <h2 class="font-display font-bold text-2xl text-brand-green mb-2">No Active Event</h2>
         <p class="text-gray-500 mb-6">Ticket registration is currently closed.</p>
         <RouterLink to="/" class="btn-green">← Back to Home</RouterLink>
@@ -137,6 +139,7 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useEventStore } from '@/stores/eventStore.js';
+import { Ticket, CalendarX, MapPin, CalendarDays, ShieldCheck, ArrowRight } from 'lucide-vue-next';
 import api from '@/composables/useApi.js';
 
 const router     = useRouter();

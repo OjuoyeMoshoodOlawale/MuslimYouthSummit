@@ -3,6 +3,9 @@
     <div class="flex items-center justify-between flex-wrap gap-3">
       <h2 class="font-display font-bold text-xl text-brand-green">Participants</h2>
       <div class="flex gap-2">
+        <RouterLink to="/admin/register" class="btn-green text-xs">
+          + Manual Register
+        </RouterLink>
         <input v-model="search" class="input text-sm w-48" placeholder="Search name / email…" @input="doSearch" />
       </div>
     </div>

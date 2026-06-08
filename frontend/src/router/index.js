@@ -12,6 +12,7 @@ const AdminLayout      = () => import('@/views/admin/AdminLayout.vue');
 const AdminDashboard   = () => import('@/views/admin/AdminDashboard.vue');
 const AdminEventDashboard = () => import('@/views/admin/AdminEventDashboard.vue');
 const AdminEvents      = () => import('@/views/admin/AdminEvents.vue');
+const AdminManualRegister = () => import('@/views/admin/AdminManualRegister.vue');
 const CreateEvent      = () => import('@/views/admin/CreateEvent.vue');
 const EventDetail      = () => import('@/views/admin/EventDetail.vue');
 const AdminSchedule    = () => import('@/views/admin/AdminSchedule.vue');
@@ -22,7 +23,7 @@ const AdminParticipants= () => import('@/views/admin/AdminParticipants.vue');
 const AdminEmail       = () => import('@/views/admin/AdminEmail.vue');
 const AdminTags        = () => import('@/views/admin/AdminTags.vue');
 const AdminReports     = () => import('@/views/admin/AdminReports.vue');
-const AdminAdmins      = () => import('@/views/admin/AdminAdmins.vue');
+const AdminManualRegister = () => import('@/views/admin/AdminManualRegister.vue');
 
 const routes = [
   { path: '/',             name: 'home',     component: Landing },
@@ -66,6 +67,8 @@ const routes = [
         meta: { roles: ['super_admin','admin'] } },
       { path: 'admins',            name: 'admin-admins',          component: AdminAdmins,
         meta: { roles: ['super_admin'] } },
+      { path: 'register',          name: 'admin-manual-register', component: AdminManualRegister,
+        meta: { roles: ['super_admin','admin'] } },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/' },

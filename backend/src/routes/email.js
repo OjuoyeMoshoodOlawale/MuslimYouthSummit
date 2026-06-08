@@ -68,3 +68,19 @@ router.post('/campaigns/:id/send', authenticate, authorize('super_admin', 'admin
 });
 
 export default router;
+
+router.put('/campaigns/:id', authenticate, authorize('super_admin', 'admin'), async (req, res, next) => {
+  try {
+    const { subject, body_html, body_text, recipient_type, event_id } = req.body;
+    await query("UPDATE email_campaigns SET subject=?, body_html=?, body_text=?, recipient_type=?, event_id=? WHERE id=? AND status='draft'",
+      [subject, body_html, body_text||null, recipient_type, event_id||null, req.params.id]);
+    success(res, null, 'Campaign updated.');
+  } catch (err) { next(err); }
+});
+
+router.delete('/campaigns/:id', authenticate, authorize('super_admin', 'admin'), async (req, res, next) => {
+  try {
+    await query("DELETE FROM email_campaigns WHERE id=? AND status='draft'", [req.params.id]);
+    success(res, null, 'Campaign deleted.');
+  } catch (err) { next(err); }
+});
