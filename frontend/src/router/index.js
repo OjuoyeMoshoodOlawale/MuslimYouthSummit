@@ -30,6 +30,8 @@ const AdminHostels        = () => import('@/views/admin/AdminHostels.vue');
 const AdminDepartments    = () => import('@/views/admin/AdminDepartments.vue');
 const AdminExpenses       = () => import('@/views/admin/AdminExpenses.vue');
 const AdminSettings       = () => import('@/views/admin/AdminSettings.vue');
+const AdminSouvenirs      = () => import('@/views/admin/AdminSouvenirs.vue');
+const Souvenirs           = () => import('@/views/Souvenirs.vue');
 
 /* ─── Roles shorthand ────────────────────────────────────── */
 const ALL_ADMIN  = ['super_admin','admin','attendant','department'];
@@ -45,6 +47,8 @@ const routes = [
   { path: '/check-in',     name: 'checkin',  component: CheckIn,
     meta: { requiresAuth: true, roles: ALL_ADMIN } },
   { path: '/past-events',  name: 'past',     component: PastEvents },
+  { path: '/shop',          name: 'shop',     component: Souvenirs },
+  { path: '/shop/verify',   name: 'shop-verify', component: Souvenirs },
 
   /* Admin login ─────────────────────────────────────────── */
   { path: '/admin/login',  name: 'admin-login', component: AdminLogin,
@@ -113,6 +117,8 @@ const routes = [
         meta: { roles: SUPER_ONLY } },
       { path: 'settings',            name: 'admin-settings',        component: AdminSettings,
         meta: { roles: ALL_ADMIN } },
+      { path: 'souvenirs',           name: 'admin-souvenirs',       component: AdminSouvenirs,
+        meta: { roles: ADMIN_ONLY } },
     ],
   },
 

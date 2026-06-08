@@ -165,6 +165,11 @@
                     class="text-gray-400 hover:text-brand-green transition-colors p-1.5" title="View Ticket">
                     <Eye :size="14" />
                   </RouterLink>
+                  <!-- Certificate -->
+                  <a :href="`/api/tickets/certificate/${r.unique_number}`" target="_blank"
+                    class="text-gray-400 hover:text-brand-green transition-colors p-1.5" title="Print Certificate">
+                    <Award :size="14" />
+                  </a>
                   <!-- Email -->
                   <button class="text-gray-400 hover:text-brand-green transition-colors p-1.5"
                     title="Send Email" @click="emailParticipant(r)">
@@ -291,7 +296,7 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import {
   Users, UserPlus, Search, X, ShieldCheck, Banknote, ReceiptText,
-  Loader, AlertTriangle, QrCode, LogOut, Eye, Mail, CheckCircle2, XCircle,
+  Loader, AlertTriangle, QrCode, LogOut, Eye, Mail, CheckCircle2, XCircle, Award,
 } from 'lucide-vue-next';
 import AppModal from '@/components/common/AppModal.vue';
 import { useAlertStore } from '@/stores/alertStore.js';

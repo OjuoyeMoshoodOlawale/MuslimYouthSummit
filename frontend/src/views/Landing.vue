@@ -232,6 +232,7 @@
                 <th class="px-3 md:px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Session</th>
                 <th class="px-3 md:px-4 py-3 text-left text-xs font-bold uppercase tracking-wider hidden md:table-cell">Lecturer</th>
                 <th class="px-3 md:px-4 py-3 text-left text-xs font-bold uppercase tracking-wider hidden lg:table-cell">Facilitator(s)</th>
+                <th class="px-3 md:px-4 py-3 text-center text-xs font-bold uppercase tracking-wider w-16">Video</th>
               </tr>
             </thead>
             <tbody>
@@ -250,6 +251,14 @@
                 </td>
                 <td class="px-3 md:px-4 py-3 text-gray-600 text-sm hidden md:table-cell">{{ l.main_speaker_name || '—' }}</td>
                 <td class="px-3 md:px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">{{ l.facilitators || '—' }}</td>
+                <td class="px-3 md:px-4 py-3 text-center">
+                  <a v-if="l.youtube_url" :href="l.youtube_url" target="_blank" rel="noopener"
+                    class="inline-flex items-center justify-center w-8 h-8 bg-red-500 text-white hover:bg-red-600 transition-colors"
+                    title="Watch Recording">
+                    <Youtube :size="14" />
+                  </a>
+                  <span v-else class="text-gray-200 text-xs">—</span>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -394,6 +403,9 @@
               <p class="text-brand-gold font-bold text-xs uppercase tracking-wider mb-3">Links</p>
               <div class="space-y-2 text-sm">
                 <RouterLink to="/past-events" class="block text-white/55 hover:text-brand-gold transition-colors">Past Editions</RouterLink>
+                <RouterLink to="/shop" class="block text-white/55 hover:text-brand-gold transition-colors">
+                  <span class="flex items-center gap-1.5"><ShoppingBag :size="11" /> Merchandise Shop</span>
+                </RouterLink>
                 <button v-if="eventStore.hasActiveEvent"
                   class="block text-white/55 hover:text-brand-gold transition-colors text-left"
                   @click="scrollTo('tickets')">Register for Ticket</button>
@@ -417,7 +429,7 @@ import { useRouter } from 'vue-router';
 import {
   Ticket, CalendarDays, MapPin, ChevronDown, Sparkles, Target, Mic, LayoutList,
   ShieldCheck, Images, History, ArrowRight, Lock, Heart, Menu, X, BookOpen,
-  Briefcase, Users, GraduationCap,
+  Briefcase, Users, GraduationCap, Youtube, ShoppingBag,
 } from 'lucide-vue-next';
 import { useEventStore }   from '@/stores/eventStore.js';
 import { useScrollReveal } from '@/composables/useScrollReveal.js';
