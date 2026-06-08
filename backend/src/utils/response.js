@@ -52,14 +52,23 @@ export const validationError = (res, errors, message = 'Validation failed. Pleas
 /**
  * Build pagination object for paginated queries
  */
-export const buildPagination = (total, page, limit) => ({
-  total: parseInt(total),
-  page: parseInt(page),
-  limit: parseInt(limit),
-  totalPages: Math.ceil(total / limit),
-  hasNext: page * limit < total,
-  hasPrev: page > 1,
-});
+export const buildPagination = (total, page, limit, rowCount = null) => {
+  const t   = parseInt(total);
+  const p   = parseInt(page);
+  const l   = parseInt(limit);
+  const off = (p - 1) * l;
+  return {
+    total:      t,
+    page:       p,
+    limit:      l,
+    pages:      Math.ceil(t / l),       // DataTable uses .pages
+    totalPages: Math.ceil(t / l),       // alias
+    from:       t === 0 ? 0 : off + 1,  // DataTable uses .from
+    to:         Math.min(off + (rowCount ?? l), t), // DataTable uses .to
+    hasNext:    p * l < t,
+    hasPrev:    p > 1,
+  };
+};
 
 /**
  * Success with inline pagination meta (4th argument)

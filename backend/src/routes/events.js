@@ -7,11 +7,10 @@ import {
   getActiveEvent, getPublicEvents, getPastEvents, getEvent, getEventSpeakers,
   adminListEvents, createEvent, updateEvent, changeEventStatus, deleteEvent,
   addEventDay, updateEventDay, deleteEventDay,
-  addLecture, updateLecture, deleteLecture,
   addSpeaker, updateSpeaker, deleteSpeaker,
   getTicketTypes, addTicketType, updateTicketType
 } from '../controllers/eventController.js';
-import { getSchedule } from '../controllers/scheduleController.js';
+import { getSchedule, createEntry, updateEntry, deleteEntry } from '../controllers/scheduleController.js';
 
 const router = express.Router();
 
@@ -45,9 +44,10 @@ router.put('/:id/days/:dayId', authenticate, authorize('super_admin', 'admin'), 
 router.delete('/:id/days/:dayId', authenticate, authorize('super_admin', 'admin'), deleteEventDay);
 
 // Lectures
-router.post('/:id/lectures', authenticate, authorize('super_admin', 'admin'), addLecture);
-router.put('/:id/lectures/:lid', authenticate, authorize('super_admin', 'admin'), updateLecture);
-router.delete('/:id/lectures/:lid', authenticate, authorize('super_admin', 'admin'), deleteLecture);
+// Lectures (schedule) — unified with scheduleController for consistent fields
+router.post('/:id/lectures',      authenticate, authorize('super_admin','admin'), validate(rules.createScheduleEntry), (req,res,next)=>{ req.params.eventId=req.params.id; createEntry(req,res,next); });
+router.put('/:id/lectures/:lid',  authenticate, authorize('super_admin','admin'), (req,res,next)=>{ req.params.id=req.params.lid; updateEntry(req,res,next); });
+router.delete('/:id/lectures/:lid', authenticate, authorize('super_admin','admin'), (req,res,next)=>{ req.params.id=req.params.lid; deleteEntry(req,res,next); });
 
 // Speakers
 router.post('/:id/speakers', authenticate, authorize('super_admin', 'admin'), addSpeaker);

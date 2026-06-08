@@ -16,7 +16,7 @@ router.get('/', authenticate, authorize('super_admin', 'admin'), async (req, res
     if (subscribed !== undefined) { sql += ' AND email_subscribed = ?'; params.push(subscribed === 'true' ? 1 : 0); }
     const [[{ total }]] = await query(`SELECT COUNT(*) AS total FROM participants WHERE 1=1${search ? ' AND (name LIKE ? OR email LIKE ? OR phone LIKE ?)' : ''}${subscribed !== undefined ? ' AND email_subscribed = ?' : ''}`, params);
     const [rows] = await query(sql + ' ORDER BY created_at DESC LIMIT ? OFFSET ?', [...params, limit, offset]);
-    paginated(res, rows, buildPagination(total, page, limit));
+    paginated(res, rows, buildPagination(total, page, limit, rows.length));
   } catch (err) { next(err); }
 });
 
