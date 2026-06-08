@@ -131,7 +131,7 @@
           placeholder="<h1>Assalamu Alaikum!</h1>&#10;<p>We're excited to announce...</p>"></textarea>
         <p class="text-xs text-gray-400 mt-1.5 flex items-center gap-1">
           <Info :size="11" />
-          You can use HTML. Variables: <code class="bg-gray-100 px-1.5 py-0.5 ml-1">{{ '{{name}}' }}</code>
+          You can use HTML. Variables: <code class="bg-gray-100 px-1.5 py-0.5 ml-1 font-mono">&#123;&#123;name&#125;&#125;</code>
           for recipient name.
         </p>
         <p v-if="errs.body_html" class="text-red-500 text-xs mt-1">{{ errs.body_html }}</p>

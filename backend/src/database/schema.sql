@@ -223,7 +223,7 @@ CREATE TABLE IF NOT EXISTS hostels (
   id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name        VARCHAR(150) NOT NULL,
   gender      ENUM('male','female','mixed') NOT NULL DEFAULT 'mixed',
-  capacity    INT UNSIGNED NOT NULL DEFAULT 0,
+  beds        INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Number of bed spaces',
   location    VARCHAR(200) NULL,
   description TEXT NULL,
   is_active   TINYINT(1) NOT NULL DEFAULT 1,

@@ -32,13 +32,13 @@ export const listAllHostels = async (req, res, next) => {
 /* ── Create hostel ───────────────────────────────────────────── */
 export const createHostel = async (req, res, next) => {
   try {
-    const { name, gender, capacity, location, description, sort_order } = req.body;
+    const { name, gender, beds, location, description, sort_order } = req.body;
     if (!name?.trim()) return error(res, 'Hostel name is required.', 400);
     if (!capacity || capacity < 1) return error(res, 'Capacity must be at least 1.', 400);
     const [r] = await query(
-      `INSERT INTO hostels (name, gender, capacity, location, description, sort_order)
+      `INSERT INTO hostels (name, gender, beds, location, description, sort_order)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [name.trim(), gender || 'mixed', capacity,
+      [name.trim(), gender || 'mixed', beds,
        location || null, description || null, sort_order ?? 0]
     );
     created(res, { id: r.insertId }, 'Hostel created.');
@@ -49,11 +49,11 @@ export const createHostel = async (req, res, next) => {
 export const updateHostel = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, gender, capacity, location, description, sort_order, is_active } = req.body;
+    const { name, gender, beds, location, description, sort_order, is_active } = req.body;
     await query(
-      `UPDATE hostels SET name=?, gender=?, capacity=?, location=?,
+      `UPDATE hostels SET name=?, gender=?, beds=?, location=?,
        description=?, sort_order=?, is_active=? WHERE id=?`,
-      [name, gender || 'mixed', capacity, location || null,
+      [name, gender || 'mixed', beds, location || null,
        description || null, sort_order ?? 0, is_active ? 1 : 0, id]
     );
     success(res, null, 'Hostel updated.');
@@ -80,7 +80,7 @@ export const hostelAvailability = async (req, res, next) => {
     const [rows] = await query(
       `SELECT h.*,
               COUNT(ha.id) AS assigned_count,
-              (h.capacity - COUNT(ha.id)) AS remaining
+              (h.beds - COUNT(ha.id)) AS remaining
        FROM hostels h
        LEFT JOIN hostel_assignments ha ON ha.hostel_id = h.id AND ha.event_id = ?
        WHERE h.is_active = 1

@@ -143,6 +143,46 @@ export const raiseExpense = async (req, res, next) => {
        parseFloat(amount_requested), priority, raise_note || null,
        due_date || null, admin.id]
     );
+
+    // Email super admins (non-blocking)
+    try {
+      const { createTransport } = await import('nodemailer');
+      const [superAdmins] = await query(
+        "SELECT name, email FROM admins WHERE role='super_admin' AND is_active=1 LIMIT 3"
+      );
+      if (superAdmins.length) {
+        const transporter = createTransport({
+          host: process.env.SMTP_HOST, port: parseInt(process.env.SMTP_PORT||'587'),
+          secure: process.env.SMTP_PORT === '465',
+          auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+        });
+        const [deptRow] = await query('SELECT name FROM departments WHERE id=?', [deptId]);
+        const priorityLabel = { urgent:'🔴 URGENT', normal:'Normal', low:'Low' }[priority] || priority;
+        for (const sa of superAdmins) {
+          transporter.sendMail({
+            from: process.env.EMAIL_FROM || 'MYS Admin <noreply@mys.com>',
+            to:   sa.email,
+            subject: `[${priorityLabel}] New Expense Request — ${deptRow?.[0]?.name || 'Department'}`,
+            html: `<div style="font-family:sans-serif;max-width:560px;padding:24px">
+              <h2 style="color:#02462E">New Expense Request</h2>
+              <table style="width:100%;border-collapse:collapse;font-size:14px">
+                <tr><td style="padding:8px 0;color:#888;width:120px">Department</td><td style="padding:8px 0;font-weight:bold">${deptRow?.[0]?.name || '—'}</td></tr>
+                <tr><td style="padding:8px 0;color:#888">Title</td><td style="padding:8px 0">${title}</td></tr>
+                <tr><td style="padding:8px 0;color:#888">Amount</td><td style="padding:8px 0;font-weight:bold;color:#02462E">₦${Number(amount_requested).toLocaleString('en-NG')}</td></tr>
+                <tr><td style="padding:8px 0;color:#888">Priority</td><td style="padding:8px 0">${priorityLabel}</td></tr>
+                <tr><td style="padding:8px 0;color:#888">Raised by</td><td style="padding:8px 0">${admin.name}</td></tr>
+                ${due_date ? `<tr><td style="padding:8px 0;color:#888">Due</td><td style="padding:8px 0">${due_date}</td></tr>` : ''}
+                ${description ? `<tr><td style="padding:8px 0;color:#888">Notes</td><td style="padding:8px 0">${description}</td></tr>` : ''}
+              </table>
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/expenses" style="display:inline-block;background:#FEC700;color:#02462E;padding:10px 24px;font-weight:bold;text-decoration:none;margin-top:16px">
+                Review Request →
+              </a>
+            </div>`,
+          }).catch(() => {});
+        }
+      }
+    } catch {}
+
     created(res, { id: r.insertId }, `Expense request submitted. Pending admin approval.`);
   } catch (e) { next(e); }
 };

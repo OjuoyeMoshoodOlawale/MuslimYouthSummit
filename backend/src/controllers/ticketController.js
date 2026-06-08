@@ -388,7 +388,7 @@ export const adminTicketStats = async (req, res, next) => {
 
     const [[attStats]] = await query(
       `SELECT COUNT(*) AS checked_in FROM attendance
-       WHERE event_id = ? AND check_in_at IS NOT NULL`,
+       WHERE event_id = ? AND checked_in_at IS NOT NULL`,
       [eventId]
     );
 

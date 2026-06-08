@@ -161,7 +161,7 @@ async function seed() {
   const hostelIds = {};
   for (const [name, gender, cap, location] of hostelData) {
     const id = await insertAndGetId(
-      `INSERT INTO hostels (name, gender, capacity, location)
+      `INSERT INTO hostels (name, gender, beds, location)
        VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE capacity=VALUES(capacity)`,
       [name, gender, cap, location],
       'SELECT id FROM hostels WHERE name=?', [name]

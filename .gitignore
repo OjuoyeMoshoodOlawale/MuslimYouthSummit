@@ -1,18 +1,18 @@
-# Dependencies
-node_modules/
-*/node_modules/
-
-# Environment files
-.env
+# ── Backend ──────────────────────────────────────────
 backend/.env
-
-# Build outputs
-frontend/dist/
-frontend/.vite/
-
-# Uploads
+backend/.env.*
+!backend/.env.example
+backend/node_modules/
 backend/uploads/
+backend/logs/
 
-# OS
+# ── Frontend ─────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+
+# ── OS / IDE ─────────────────────────────────────────
 .DS_Store
+Thumbs.db
 *.log
+.vscode/settings.json
+.idea/

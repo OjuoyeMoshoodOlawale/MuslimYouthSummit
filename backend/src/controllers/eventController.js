@@ -17,7 +17,7 @@ export const getActiveEvent = async (req, res, next) => {
        ORDER BY e.start_date ASC LIMIT 1`
     );
 
-    if (!events.length) return notFoundRes(res, 'Active event');
+    if (!events.length) return success(res, null, 'No active event.');
 
     const event = events[0];
     const eventData = await enrichEvent(event.id, event);

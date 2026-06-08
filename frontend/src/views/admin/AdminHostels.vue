@@ -51,19 +51,19 @@
           </span>
         </div>
 
-        <!-- Capacity bar -->
+        <!-- Beds bar -->
         <div class="mb-4">
           <div class="flex justify-between text-xs text-gray-500 mb-1.5">
-            <span class="flex items-center gap-1"><Users :size="11" /> Capacity</span>
-            <span class="font-semibold">{{ h.total_assigned || 0 }} / {{ h.capacity }}</span>
+            <span class="flex items-center gap-1"><Users :size="11" /> Beds</span>
+            <span class="font-semibold">{{ h.total_assigned || 0 }} / {{ h.beds }}</span>
           </div>
           <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
             <div class="h-full rounded-full transition-all duration-500"
-              :class="pctClass(h.total_assigned, h.capacity)"
-              :style="{ width: `${Math.min(100, ((h.total_assigned||0)/h.capacity)*100)}%` }"></div>
+              :class="pctClass(h.total_assigned, h.beds)"
+              :style="{ width: `${Math.min(100, ((h.total_assigned||0)/h.beds)*100)}%` }"></div>
           </div>
-          <p class="text-xs mt-1" :class="(h.capacity-(h.total_assigned||0)) > 0 ? 'text-green-600' : 'text-red-500'">
-            {{ h.capacity - (h.total_assigned||0) }} beds remaining
+          <p class="text-xs mt-1" :class="(h.beds-(h.total_assigned||0)) > 0 ? 'text-green-600' : 'text-red-500'">
+            {{ h.beds - (h.total_assigned||0) }} beds remaining
           </p>
         </div>
 
@@ -110,9 +110,9 @@
           </select>
         </div>
         <div>
-          <label class="label">Capacity <span class="text-red-500">*</span></label>
-          <input v-model.number="form.capacity" type="number" min="1" class="input" :class="{'input-error':errs.capacity}" placeholder="50" />
-          <p v-if="errs.capacity" class="text-red-500 text-xs mt-1">{{ errs.capacity }}</p>
+          <label class="label">Beds <span class="text-red-500">*</span></label>
+          <input v-model.number="form.beds" type="number" min="1" class="input" :class="{'input-error':errs."beds"}" placeholder="50" />
+          <p v-if="errs."beds"" class="text-red-500 text-xs mt-1">{{ errs."beds" }}</p>
         </div>
       </div>
       <div>
@@ -165,14 +165,14 @@ const saving  = ref(false);
 const modal   = ref(false);
 const editing = ref(null);
 
-const form = reactive({ name:'', gender:'mixed', capacity:50, location:'', description:'', sort_order:0, is_active:1 });
-const errs = reactive({ name:'', capacity:'' });
+const form = reactive({ name:'', gender:'mixed', "beds":50, location:'', description:'', sort_order:0, is_active:1 });
+const errs = reactive({ name:'', "beds":'' });
 
 const summaryStats = computed(() => [
   { label:'Total Hostels', value: hostels.value.length, icon: BedDouble,   bg:'bg-brand-cream' },
   { label:'Male',          value: hostels.value.filter(h=>h.gender==='male').length,   icon: UserCheck, bg:'bg-blue-50'   },
   { label:'Female',        value: hostels.value.filter(h=>h.gender==='female').length, icon: UserX,     bg:'bg-pink-50'   },
-  { label:'Total Beds',    value: hostels.value.reduce((s,h)=>s+h.capacity,0), icon: Users, bg:'bg-green-50'  },
+  { label:'Total Beds',    value: hostels.value.reduce((s,h)=>s+h.beds,0), icon: Users, bg:'bg-green-50'  },
 ]);
 
 const genderIcon = (g) => ({ male:UserCheck, female:UserX, mixed:Blend }[g] || Blend);
@@ -193,22 +193,22 @@ const load = async () => {
 onMounted(load);
 
 const resetForm = () => {
-  Object.assign(form, { name:'', gender:'mixed', capacity:50, location:'', description:'', sort_order:0, is_active:1 });
-  Object.assign(errs, { name:'', capacity:'' });
+  Object.assign(form, { name:'', gender:'mixed', "beds":50, location:'', description:'', sort_order:0, is_active:1 });
+  Object.assign(errs, { name:'', "beds":'' });
 };
 
 const openCreate = () => { editing.value = null; resetForm(); modal.value = true; };
 const openEdit   = (h)  => {
   editing.value = h.id;
-  Object.assign(form, { name:h.name, gender:h.gender, capacity:h.capacity, location:h.location||'',
+  Object.assign(form, { name:h.name, gender:h.gender, "beds":h.beds, location:h.location||'',
     description:h.description||'', sort_order:h.sort_order, is_active:h.is_active });
   modal.value = true;
 };
 
 const validate = () => {
   errs.name     = form.name.trim()       ? '' : 'Name is required.';
-  errs.capacity = form.capacity >= 1     ? '' : 'Capacity must be at least 1.';
-  return !errs.name && !errs.capacity;
+  errs."beds" = form.beds >= 1     ? '' : 'Beds must be at least 1.';
+  return !errs.name && !errs."beds";
 };
 
 const save = async () => {
