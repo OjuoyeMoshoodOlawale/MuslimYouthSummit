@@ -331,6 +331,8 @@ const sendReminders = async () => {
   } catch (err) { alert.error(err.response?.data?.message || 'Reminder send failed.'); }
   finally { reminding.value = false; }
 };
+
+const doClone = async () => {
   if (!cloneSource.value) return;
   cloning.value = true;
   try {

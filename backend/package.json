@@ -8,6 +8,7 @@
     "dev":   "nodemon src/index.js",
     "start": "node src/index.js",
     "seed":  "node src/database/seed.js",
+    "demo":  "node src/database/seed.demo.js",
     "db":    "node -e \"import('./src/database/db.js').then(m=>m.query('SELECT 1+1 AS ok')).then(([r])=>console.log('DB OK:',r[0])).catch(e=>console.error('DB FAIL:',e.message))\""
   },
   "dependencies": {
