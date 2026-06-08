@@ -8,7 +8,7 @@
       <div class="flex gap-2 items-center">
         <select v-model="selectedEvent" class="input text-sm w-52" @change="load">
           <option value="">Select event…</option>
-          <option v-for="e in events" :key="e.id" :value="e.id">{{ e.title }}</option>
+          <option v-for="e in events" :key="e.id" :value="e.id">{{ e.edition ? `[${e.edition}] ${e.title}` : e.title }}</option>
         </select>
         <button v-if="selectedEvent" class="btn-outline text-xs" @click="load">↺ Refresh</button>
       </div>

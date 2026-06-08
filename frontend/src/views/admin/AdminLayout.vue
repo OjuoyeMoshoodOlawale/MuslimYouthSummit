@@ -44,6 +44,7 @@ const titles = {
   'admin-gallery':         'Gallery',
   'admin-participants':    'Participants',
   'admin-manual-register': 'Manual Registration',
+  'admin-hostels':         'Hostels',
   'admin-email':           'Email Campaigns',
   'admin-tags':            'Event Tags',
   'admin-admins':          'Admin Accounts',

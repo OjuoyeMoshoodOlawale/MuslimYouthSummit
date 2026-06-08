@@ -316,3 +316,63 @@ CREATE TABLE IF NOT EXISTS event_snapshots (
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_categories_event ON event_categories(event_id, sort_order);
+
+-- =============================================================
+-- PHASE 3 ADDITIONS
+-- =============================================================
+
+-- -------------------------------------------------------------
+-- CATEGORIES: global, reusable across events (no event_id)
+-- Apply with: ALTER TABLE event_categories DROP COLUMN event_id;
+-- For fresh installs the table below replaces the phase-2 one.
+-- -------------------------------------------------------------
+-- (migration note: run this on existing DBs)
+-- ALTER TABLE event_categories DROP FOREIGN KEY fk_category_event_id;
+-- ALTER TABLE event_categories DROP COLUMN event_id;
+
+-- -------------------------------------------------------------
+-- HOSTELS
+-- -------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS hostels (
+  id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name        VARCHAR(150) NOT NULL,
+  gender      ENUM('male','female','mixed') NOT NULL DEFAULT 'mixed',
+  capacity    INT UNSIGNED NOT NULL DEFAULT 0,
+  location    VARCHAR(200),
+  description TEXT,
+  is_active   TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order  TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- Hostel assignments per event (who sleeps where)
+CREATE TABLE IF NOT EXISTS hostel_assignments (
+  id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  hostel_id       INT UNSIGNED NOT NULL,
+  event_id        INT UNSIGNED NOT NULL,
+  ticket_id       INT UNSIGNED NOT NULL UNIQUE,
+  participant_id  INT UNSIGNED NOT NULL,
+  room_number     VARCHAR(30),
+  notes           TEXT,
+  assigned_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  assigned_by     INT UNSIGNED,
+  FOREIGN KEY (hostel_id)      REFERENCES hostels(id),
+  FOREIGN KEY (event_id)       REFERENCES events(id),
+  FOREIGN KEY (ticket_id)      REFERENCES tickets(id),
+  FOREIGN KEY (participant_id) REFERENCES participants(id),
+  FOREIGN KEY (assigned_by)    REFERENCES admins(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- Facilitator email reminders log
+CREATE TABLE IF NOT EXISTS facilitator_reminders (
+  id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  lecture_id    INT UNSIGNED NOT NULL,
+  email         VARCHAR(191) NOT NULL,
+  sent_at       DATETIME,
+  status        ENUM('pending','sent','failed') NOT NULL DEFAULT 'pending',
+  FOREIGN KEY (lecture_id) REFERENCES lectures(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_hostels_active  ON hostels(is_active, gender);
+CREATE INDEX idx_hostel_event    ON hostel_assignments(event_id, hostel_id);

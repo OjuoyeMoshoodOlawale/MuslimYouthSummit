@@ -5,7 +5,7 @@
       <div class="flex gap-3 items-center">
         <select v-model="selectedEvent" class="input text-sm w-48" @change="load">
           <option value="">Select event…</option>
-          <option v-for="e in events" :key="e.id" :value="e.id">{{ e.title }}</option>
+          <option v-for="e in events" :key="e.id" :value="e.id">{{ e.edition ? `[${e.edition}] ${e.title}` : e.title }}</option>
         </select>
         <button :disabled="!selectedEvent" class="btn-green text-xs" @click="uploadModal = true">+ Upload Photos</button>
       </div>

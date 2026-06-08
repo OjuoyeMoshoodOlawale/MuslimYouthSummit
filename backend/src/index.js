@@ -23,6 +23,7 @@ import participantRoutes from './routes/participants.js';
 import scheduleRoutes    from './routes/schedule.js';
 import categoryRoutes    from './routes/categories.js';
 import reportsRoutes     from './routes/reports.js';
+import hostelRoutes      from './routes/hostels.js';
 import { cloneEvent }    from './controllers/cloneController.js';
 import { authenticate, authorize } from './middleware/auth.js';
 
@@ -105,7 +106,13 @@ app.use('/api/participants', participantRoutes);
 app.use('/api', scheduleRoutes);
 app.use('/api', categoryRoutes);
 app.use('/api', reportsRoutes);
+app.use('/api', hostelRoutes);
 app.post('/api/events/clone', authenticate, authorize('super_admin','admin'), cloneEvent);
+
+// Facilitator reminders
+import { sendFacilitatorReminders } from './controllers/scheduleController.js';
+app.post('/api/events/:eventId/schedule/remind',
+  authenticate, authorize('super_admin','admin'), sendFacilitatorReminders);
 
 // ─── Error Handling ──────────────────────────────────────────
 app.use(notFound);

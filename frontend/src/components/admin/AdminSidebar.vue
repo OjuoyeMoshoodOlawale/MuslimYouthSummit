@@ -54,7 +54,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore.js';
 import {
   LayoutDashboard, TrendingUp, FileBarChart2, CalendarDays, Tag, ShieldCheck,
-  Ticket, Image, Users, Mail, Key, ChevronLeft, ChevronRight, LogOut, Tags, UserPlus,
+  Ticket, Image, Users, Mail, Key, ChevronLeft, ChevronRight, LogOut, Tags,
+  UserPlus, BedDouble,
 } from 'lucide-vue-next';
 
 defineProps({ collapsed: { type: Boolean, default: false } });
@@ -87,6 +88,7 @@ const allSections = [
     links: [
       { to:'/admin/attendance', label:'Attendance',  icon:ShieldCheck, roles:['super_admin','admin','attendant'] },
       { to:'/admin/tags',       label:'Event Tags',  icon:Tags,        roles:['super_admin','admin'] },
+      { to:'/admin/hostels',    label:'Hostels',     icon:BedDouble,   roles:['super_admin','admin'] },
       { to:'/admin/gallery',    label:'Gallery',     icon:Image,       roles:['super_admin','admin'] },
     ],
   },

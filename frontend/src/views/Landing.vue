@@ -22,80 +22,73 @@
       </div>
     </nav>
 
-    <!-- ── HERO ─────────────────────────────────────────── -->
-    <section class="relative min-h-screen bg-brand-green geometric-bg flex flex-col items-center justify-center text-white overflow-hidden">
-      <!-- Background decoration -->
-      <div class="absolute top-0 right-0 w-[600px] h-[600px] bg-brand-gold/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
-      <div class="absolute bottom-0 left-0 w-[500px] h-[500px] bg-brand-lightgreen/5 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl"></div>
-
-      <div class="relative text-center px-6 max-w-5xl mx-auto pt-20">
-        <!-- Logo with float animation -->
-        <div class="float-anim inline-block mb-8">
-          <img src="/logos/logo-white.png" alt="Muslim Youth Summit" class="h-24 md:h-32 mx-auto drop-shadow-2xl" />
-        </div>
-
+    <!-- ── HERO (animated entrance) ──────────────────────────── -->
+    <HeroAnimation>
+      <template #badge>
         <template v-if="eventStore.hasActiveEvent">
-          <!-- Live badge -->
           <div class="inline-flex items-center gap-2 bg-brand-gold/15 border border-brand-gold/30
-                      text-brand-gold text-xs font-bold uppercase tracking-[0.2em] px-5 py-2 mb-8">
+                      text-brand-gold text-xs font-bold uppercase tracking-[0.2em] px-5 py-2">
             <span class="w-2 h-2 rounded-full bg-brand-gold pulse-glow"></span>
             {{ eventStore.activeEvent.edition }} · Registration Open
           </div>
-
-          <h1 class="font-display font-bold text-4xl md:text-6xl lg:text-7xl mb-5 leading-[1.05]
-                     bg-gradient-to-r from-white via-white to-white/70 bg-clip-text text-transparent">
-            {{ eventStore.activeEvent.title }}
-          </h1>
-          <p class="text-white/65 text-lg md:text-xl mb-4 max-w-2xl mx-auto leading-relaxed">
-            {{ eventStore.activeEvent.tagline }}
-          </p>
-          <div class="flex items-center justify-center gap-6 text-sm text-white/50 mb-10 flex-wrap">
-            <span class="flex items-center gap-2">
-              <CalendarDays :size="15" class="text-brand-gold" />
-              {{ formatDateRange(eventStore.activeEvent.start_date, eventStore.activeEvent.end_date) }}
-            </span>
-            <span v-if="eventStore.activeEvent.venue" class="flex items-center gap-2">
-              <MapPin :size="15" class="text-brand-gold" />
-              {{ eventStore.activeEvent.venue }}
-            </span>
-          </div>
-
-          <!-- Countdown -->
-          <div class="mb-12">
-            <p class="text-white/30 text-xs uppercase tracking-[0.25em] mb-4">Event Countdown</p>
-            <CountdownTimer :targetDate="eventStore.activeEvent.start_date + 'T08:00:00'" />
-          </div>
-
-          <!-- DUAL CTA BUTTONS -->
-          <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a href="#tickets" class="btn-gold text-sm px-10 py-4 w-full sm:w-auto justify-center text-center">
-              <Ticket :size="18" /> Register &amp; Buy Ticket
-            </a>
-            <a href="#schedule" class="btn-white text-sm px-10 py-4 w-full sm:w-auto justify-center">
-              <CalendarCheck :size="18" /> View Programme
-            </a>
-          </div>
         </template>
+      </template>
 
-        <template v-else>
-          <h1 class="font-display font-bold text-5xl md:text-7xl mb-6 leading-tight">
-            Muslim Youth Summit
-          </h1>
-          <p class="text-white/60 text-xl mb-10 max-w-xl mx-auto">
-            Reforming hearts. Building leaders. Connecting futures.
-          </p>
+      <template #title>
+        <template v-if="eventStore.hasActiveEvent">
+          <span class="bg-gradient-to-r from-white via-white to-white/70 bg-clip-text text-transparent">
+            {{ eventStore.activeEvent.title }}
+          </span>
+        </template>
+        <template v-else>Muslim Youth Summit</template>
+      </template>
+
+      <template #tagline>
+        <template v-if="eventStore.hasActiveEvent">{{ eventStore.activeEvent.tagline }}</template>
+        <template v-else>Reforming hearts. Building leaders. Connecting futures.</template>
+      </template>
+
+      <template #meta>
+        <div v-if="eventStore.hasActiveEvent" class="flex items-center justify-center gap-6 text-sm text-white/50 flex-wrap">
+          <span class="flex items-center gap-2"><CalendarDays :size="15" class="text-brand-gold" />
+            {{ formatDateRange(eventStore.activeEvent.start_date, eventStore.activeEvent.end_date) }}
+          </span>
+          <span v-if="eventStore.activeEvent.venue" class="flex items-center gap-2">
+            <MapPin :size="15" class="text-brand-gold" /> {{ eventStore.activeEvent.venue }}
+          </span>
+        </div>
+      </template>
+
+      <template #countdown>
+        <div v-if="eventStore.hasActiveEvent">
+          <p class="text-white/30 text-xs uppercase tracking-[0.25em] mb-4">Event Countdown</p>
+          <CountdownTimer :targetDate="eventStore.activeEvent.start_date + 'T08:00:00'" />
+        </div>
+      </template>
+
+      <template #cta>
+        <div v-if="eventStore.hasActiveEvent" class="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <a href="#tickets" class="btn-gold text-sm px-10 py-4 w-full sm:w-auto justify-center text-center">
+            <Ticket :size="18" /> Register &amp; Buy Ticket
+          </a>
+          <a href="#schedule" class="btn-white text-sm px-10 py-4 w-full sm:w-auto justify-center">
+            <CalendarCheck :size="18" /> View Programme
+          </a>
+        </div>
+        <div v-else>
           <a href="#past-events" class="btn-gold px-10 py-4">
             <Clock :size="18" /> View Past Editions
           </a>
-        </template>
-      </div>
+        </div>
+      </template>
 
-      <!-- Scroll cue -->
-      <div class="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 animate-bounce">
-        <span class="text-white/20 text-xs uppercase tracking-[0.2em]">Scroll</span>
-        <ChevronDown :size="20" class="text-white/30" />
-      </div>
-    </section>
+      <template #scroll>
+        <div class="flex flex-col items-center gap-2 animate-bounce">
+          <span class="text-white/20 text-xs uppercase tracking-[0.2em]">Scroll</span>
+          <ChevronDown :size="20" class="text-white/30" />
+        </div>
+      </template>
+    </HeroAnimation>
 
     <!-- ── ABOUT ─────────────────────────────────────────── -->
     <section id="about" class="py-24 bg-brand-cream">
@@ -309,6 +302,7 @@ import {
 } from 'lucide-vue-next';
 import { useEventStore } from '@/stores/eventStore.js';
 import { useScrollReveal } from '@/composables/useScrollReveal.js';
+import HeroAnimation   from '@/components/landing/HeroAnimation.vue';
 import CountdownTimer  from '@/components/landing/CountdownTimer.vue';
 import SpeakerCard     from '@/components/landing/SpeakerCard.vue';
 import TicketCard      from '@/components/landing/TicketCard.vue';

@@ -28,12 +28,13 @@ export const getActiveEvent = async (req, res, next) => {
   }
 };
 
-// ── Get All Events (public) ──────────────────────────────────
+// ── Get All Events (public + admin dropdown) ─────────────────
 export const getPublicEvents = async (req, res, next) => {
   try {
     const [events] = await query(
       `SELECT id, title, tagline, edition, start_date, end_date,
-              venue, status, cover_image_url, early_bird_closes_at
+              venue, status, cover_image_url, early_bird_closes_at,
+              CONCAT('[', edition, '] ', title) AS display_title
        FROM events WHERE status IN ('active','completed','draft','archived')
        ORDER BY start_date DESC`
     );

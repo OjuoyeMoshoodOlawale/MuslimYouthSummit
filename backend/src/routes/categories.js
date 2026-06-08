@@ -1,4 +1,3 @@
-import { validate, rules } from '../middleware/validate.js';
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import {
@@ -6,20 +5,16 @@ import {
   deleteCategory, assignCategory,
 } from '../controllers/categoriesController.js';
 
-const router = express.Router({ mergeParams: true });
+const router = express.Router();
+const adm = [authenticate, authorize('super_admin','admin')];
 
-// Public: list active categories for an event (used on registration form)
-router.get('/events/:eventId/categories', listCategories);
+// Global categories (no event_id)
+router.get('/categories',          listCategories);          // public — registration form needs it
+router.post('/categories',         ...adm, createCategory);
+router.put('/categories/:id',      ...adm, updateCategory);
+router.delete('/categories/:id',   ...adm, deleteCategory);
 
-// Admin CRUD
-router.post('/events/:eventId/categories',
-  authenticate, authorize('super_admin','admin'), createCategory);
-router.put('/categories/:id',
-  authenticate, authorize('super_admin','admin'), updateCategory);
-router.delete('/categories/:id',
-  authenticate, authorize('super_admin','admin'), deleteCategory);
-
-// Assign at registration / check-in (all authenticated roles)
+// Assign to a ticket (check-in roles)
 router.patch('/tickets/:ticketId/category', authenticate, assignCategory);
 
 export default router;

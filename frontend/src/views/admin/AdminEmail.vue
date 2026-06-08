@@ -108,7 +108,7 @@
           <label class="label">Related Event <span class="text-gray-400 font-normal">(optional)</span></label>
           <select v-model="form.event_id" class="input">
             <option value="">None</option>
-            <option v-for="e in events" :key="e.id" :value="e.id">{{ e.title }}</option>
+            <option v-for="e in events" :key="e.id" :value="e.id">{{ e.edition ? `[${e.edition}] ${e.title}` : e.title }}</option>
           </select>
         </div>
       </div>

@@ -163,7 +163,7 @@ onMounted(async () => {
   loading.value = false;
   if (eventStore.activeEvent) {
     try {
-      const { data } = await api.get(`/events/${eventStore.activeEvent.id}/categories`);
+      const { data } = await api.get(`/categories`);
       categories.value = (data.data || []).filter(c => c.is_active);
     } catch {}
   }

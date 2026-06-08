@@ -203,3 +203,99 @@ export const cloneSchedule = async (req, res, next) => {
     success(res, null, `Schedule cloned from event ${fromEventId} to ${toEventId}.`);
   } catch (e) { next(e); }
 };
+
+/* ── Send facilitator reminder emails ────────────────────────── */
+export const sendFacilitatorReminders = async (req, res, next) => {
+  try {
+    const { eventId } = req.params;
+    const { lecture_ids } = req.body; // optional: specific lecture IDs, else all for event
+
+    // Get event info
+    const [events] = await query('SELECT * FROM events WHERE id=?', [eventId]);
+    if (!events.length) { const { notFound } = await import('../utils/response.js'); return notFound(res, 'Event'); }
+    const event = events[0];
+
+    // Get lectures with facilitators
+    let sql = `SELECT id, title, start_time, end_time, event_day_id,
+                      main_speaker_name, facilitators
+               FROM lectures WHERE event_id=? AND facilitators IS NOT NULL AND facilitators != ''`;
+    const params = [eventId];
+    if (lecture_ids?.length) { sql += ` AND id IN (${lecture_ids.map(()=>'?').join(',')})`; params.push(...lecture_ids); }
+
+    const [lectures] = await query(sql, params);
+    if (!lectures.length) {
+      const { error } = await import('../utils/response.js');
+      return error(res, 'No lectures with facilitators found.', 400);
+    }
+
+    // Get day dates
+    const [days] = await query('SELECT * FROM event_days WHERE event_id=?', [eventId]);
+    const dayMap = Object.fromEntries(days.map(d => [d.id, d]));
+
+    const { createTransport } = await import('nodemailer');
+    const transporter = createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_PORT === '465',
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    });
+
+    let sent = 0, failed = 0, skipped = 0;
+    const results = [];
+
+    for (const lec of lectures) {
+      const names = lec.facilitators.split(',').map(n => n.trim()).filter(Boolean);
+      const day   = lec.event_day_id ? dayMap[lec.event_day_id] : null;
+
+      for (const facilitatorName of names) {
+        // Try to find email from participants table by name match (best effort)
+        const [matches] = await query(
+          'SELECT email FROM participants WHERE name LIKE ? LIMIT 1',
+          [`%${facilitatorName}%`]
+        );
+        if (!matches.length) { skipped++; results.push({ facilitator: facilitatorName, status: 'no_email' }); continue; }
+
+        const recipientEmail = matches[0].email;
+        try {
+          await transporter.sendMail({
+            from:    process.env.EMAIL_FROM || 'MYS <noreply@mys.com>',
+            to:      recipientEmail,
+            subject: `[Reminder] You are facilitating "${lec.title}" — ${event.title}`,
+            html: `
+              <div style="font-family:'Segoe UI',sans-serif;max-width:580px;margin:0 auto;background:#FBF6E6;padding:32px 24px">
+                <img src="https://muslimyouthsummit.com/logos/logo-black.png" alt="MYS" style="height:44px;margin-bottom:24px" />
+                <h2 style="color:#02462E;font-size:22px;margin:0 0 8px">Assalamu Alaikum, ${facilitatorName}!</h2>
+                <p style="color:#555;line-height:1.7">This is a reminder that you are listed as a <strong>facilitator</strong> for the following session:</p>
+                <div style="background:#02462E;color:white;padding:20px 24px;margin:20px 0;border-left:4px solid #FEC700">
+                  <p style="margin:0 0 6px;font-size:18px;font-weight:bold">${lec.title}</p>
+                  ${day ? `<p style="margin:0 0 4px;color:rgba(255,255,255,0.7)">Day ${day.day_number} — ${new Date(day.event_date).toLocaleDateString('en-NG',{weekday:'long',day:'numeric',month:'long'})}</p>` : ''}
+                  ${lec.start_time ? `<p style="margin:0;color:#FEC700;font-weight:bold">${lec.start_time}${lec.end_time ? ' – ' + lec.end_time : ''}</p>` : ''}
+                  ${lec.main_speaker_name ? `<p style="margin:8px 0 0;color:rgba(255,255,255,0.6);font-size:13px">Lecturer: ${lec.main_speaker_name}</p>` : ''}
+                </div>
+                <div style="background:#fff;border:1px solid #e5e7eb;padding:16px 20px;margin:16px 0">
+                  <p style="margin:0 0 8px;font-weight:bold;color:#02462E">Event Details</p>
+                  <p style="margin:0;color:#555;font-size:14px">${event.title} — ${event.venue || ''}</p>
+                  <p style="margin:4px 0 0;color:#555;font-size:14px">${new Date(event.start_date).toLocaleDateString('en-NG',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>
+                </div>
+                <p style="color:#888;font-size:13px;margin-top:24px">Please ensure you arrive at least 15 minutes before your session. JazakAllahu Khayran.</p>
+                <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0" />
+                <p style="color:#aaa;font-size:12px;margin:0">Muslim Youth Summit Admin</p>
+              </div>`,
+          });
+          await query(
+            `INSERT INTO facilitator_reminders (lecture_id, email, sent_at, status) VALUES (?,?,NOW(),'sent')
+             ON DUPLICATE KEY UPDATE sent_at=NOW(), status='sent'`,
+            [lec.id, recipientEmail]
+          );
+          sent++; results.push({ facilitator: facilitatorName, email: recipientEmail, status: 'sent' });
+        } catch (emailErr) {
+          failed++; results.push({ facilitator: facilitatorName, email: recipientEmail, status: 'failed', error: emailErr.message });
+        }
+      }
+    }
+
+    const { success } = await import('../utils/response.js');
+    success(res, { sent, failed, skipped, results },
+      `Reminders: ${sent} sent, ${failed} failed, ${skipped} skipped (no email found).`);
+  } catch (e) { next(e); }
+};

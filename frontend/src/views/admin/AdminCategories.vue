@@ -3,44 +3,35 @@
     <div class="flex items-center justify-between flex-wrap gap-3">
       <div>
         <h2 class="font-display font-bold text-xl text-brand-green">Event Categories</h2>
-        <p class="text-sm text-gray-500">Divisions / class groups — assigned at registration</p>
+        <p class="text-sm text-gray-500">Global divisions/classes — permanent, reused across all events</p>
       </div>
-      <div class="flex gap-2 items-center">
-        <select v-model="selectedEvent" class="input text-sm w-52" @change="load">
-          <option value="">Select event…</option>
-          <option v-for="e in events" :key="e.id" :value="e.id">{{ e.title }}</option>
-        </select>
-        <button :disabled="!selectedEvent" class="btn-green text-xs" @click="openCreate">
-          + Add Category
-        </button>
-      </div>
+      <button class="btn-green text-xs" @click="openCreate">
+        <Plus :size="14" /> Add Category
+      </button>
     </div>
 
-    <!-- Stats row -->
-    <div v-if="selectedEvent && categories.length" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <!-- Stats badges -->
+    <div v-if="categories.length" class="flex flex-wrap gap-3">
       <div v-for="c in categories" :key="c.id"
-        class="bg-white border border-gray-100 p-4 relative overflow-hidden">
-        <div class="absolute top-0 left-0 w-1 h-full" :style="{ backgroundColor: c.color }"></div>
-        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 pl-3">{{ c.name }}</p>
-        <p class="font-display font-bold text-3xl text-brand-green pl-3">{{ c.registered_count ?? 0 }}</p>
-        <p class="text-xs text-gray-400 mt-1 pl-3">
-          {{ c.capacity ? `of ${c.capacity}` : 'unlimited' }}
-        </p>
+        class="flex items-center gap-2 px-3 py-1.5 border border-gray-100 bg-white text-sm">
+        <span class="w-3 h-3 rounded-sm flex-shrink-0" :style="{ backgroundColor: c.color }"></span>
+        <span class="font-semibold text-gray-700">{{ c.name }}</span>
+        <span class="text-gray-400 text-xs">{{ c.registered_count || 0 }} registered</span>
       </div>
     </div>
 
     <!-- Table -->
-    <div v-if="selectedEvent" class="bg-white border border-gray-100">
+    <div class="bg-white border border-gray-100 overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-sm" v-if="categories.length">
           <thead class="bg-gray-50 border-b border-gray-100">
             <tr>
-              <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 w-8">#</th>
-              <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Category</th>
-              <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Registered</th>
-              <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Capacity</th>
-              <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Status</th>
-              <th class="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-500">Actions</th>
+              <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-400 w-8">#</th>
+              <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-400">Category</th>
+              <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-400">Registered</th>
+              <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-400">Capacity</th>
+              <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-400">Status</th>
+              <th class="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-400">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -49,42 +40,58 @@
               <td class="px-5 py-3 text-gray-400 font-mono text-xs">{{ i+1 }}</td>
               <td class="px-5 py-3">
                 <div class="flex items-center gap-2">
-                  <span class="w-3 h-3 rounded-sm flex-shrink-0" :style="{ backgroundColor: c.color }"></span>
+                  <span class="w-4 h-4 rounded-sm flex-shrink-0" :style="{ backgroundColor: c.color }"></span>
                   <div>
-                    <p class="font-semibold text-gray-800">{{ c.name }}</p>
+                    <p class="font-semibold">{{ c.name }}</p>
                     <p v-if="c.description" class="text-xs text-gray-400">{{ c.description }}</p>
                   </div>
                 </div>
               </td>
-              <td class="px-5 py-3 font-bold text-brand-green">{{ c.registered_count ?? 0 }}</td>
-              <td class="px-5 py-3 text-gray-500">{{ c.capacity ?? 'Unlimited' }}</td>
+              <td class="px-5 py-3 font-bold text-brand-green">{{ c.registered_count || 0 }}</td>
+              <td class="px-5 py-3 text-gray-500">
+                <div v-if="c.capacity">
+                  <div class="flex items-center gap-2">
+                    <span>{{ c.capacity }}</span>
+                    <div class="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div class="h-full bg-brand-green rounded-full"
+                        :style="{ width: `${Math.min(100,((c.registered_count||0)/c.capacity)*100)}%` }"></div>
+                    </div>
+                  </div>
+                </div>
+                <span v-else class="text-gray-300">Unlimited</span>
+              </td>
               <td class="px-5 py-3">
                 <span class="badge text-xs" :class="c.is_active ? 'badge-green' : 'bg-gray-100 text-gray-400'">
                   {{ c.is_active ? 'Active' : 'Inactive' }}
                 </span>
               </td>
               <td class="px-5 py-3 text-right">
-                <div class="flex gap-2 justify-end">
-                  <button class="text-xs text-brand-green underline font-semibold" @click="openEdit(c)">Edit</button>
-                  <button class="text-xs text-red-400 hover:text-red-600 font-semibold" @click="remove(c)">Delete</button>
+                <div class="flex gap-2 justify-end items-center">
+                  <button class="text-brand-green hover:opacity-70 transition-opacity" @click="openEdit(c)" title="Edit">
+                    <Pencil :size="14" />
+                  </button>
+                  <button class="text-gray-400 hover:text-red-400 transition-colors" @click="remove(c)" title="Delete">
+                    <Trash2 :size="14" />
+                  </button>
                 </div>
               </td>
             </tr>
           </tbody>
         </table>
-        <div v-else class="py-12 text-center text-gray-400 text-sm">
-          No categories yet. Create divisions/classes for this event.
+        <div v-else class="py-16 text-center text-gray-400 text-sm">
+          <Tag :size="36" class="mx-auto mb-3 opacity-30" />
+          <p>No categories yet. Create your first division/class.</p>
         </div>
       </div>
     </div>
-    <div v-else class="text-center py-12 text-gray-300 text-sm">Select an event above.</div>
   </div>
 
   <AppModal v-model="modal" :title="editing ? 'Edit Category' : 'New Category'" size="md">
     <form @submit.prevent="save" class="space-y-4" novalidate>
       <div>
         <label class="label">Name <span class="text-red-500">*</span></label>
-        <input v-model="form.name" class="input" placeholder="Youth / Professionals / Brother A…" />
+        <input v-model="form.name" class="input" :class="{'input-error':errs.name}"
+          placeholder="Youth / Professionals / Brother A / Sister B…" />
         <p v-if="errs.name" class="text-red-500 text-xs mt-1">{{ errs.name }}</p>
       </div>
       <div>
@@ -95,12 +102,12 @@
         <div>
           <label class="label">Badge Colour</label>
           <div class="flex items-center gap-3">
-            <input v-model="form.color" type="color" class="w-12 h-10 border border-gray-200 cursor-pointer rounded" />
+            <input v-model="form.color" type="color" class="w-12 h-10 border border-gray-200 cursor-pointer" />
             <input v-model="form.color" class="input text-sm font-mono" placeholder="#02462E" />
           </div>
         </div>
         <div>
-          <label class="label">Capacity</label>
+          <label class="label">Capacity <span class="text-gray-400 font-normal text-xs">(per event)</span></label>
           <input v-model.number="form.capacity" type="number" min="1" class="input" placeholder="Unlimited" />
         </div>
       </div>
@@ -110,18 +117,19 @@
           <input v-model.number="form.sort_order" type="number" min="0" class="input" />
         </div>
         <div>
-          <label class="label">Active</label>
+          <label class="label">Status</label>
           <select v-model="form.is_active" class="input">
-            <option :value="1">Yes</option>
-            <option :value="0">No</option>
+            <option :value="1">Active</option>
+            <option :value="0">Inactive</option>
           </select>
         </div>
       </div>
-      <div class="flex gap-2 pt-2 border-t border-gray-100">
-        <button type="submit" :disabled="saving" class="btn-green text-xs">
+      <div class="flex gap-2 pt-3 border-t border-gray-100">
+        <button type="submit" :disabled="saving" class="btn-green text-xs px-6 flex items-center gap-2">
+          <component :is="saving ? Loader : Save" :size="14" :class="saving?'animate-spin':''"/>
           {{ saving ? 'Saving…' : (editing ? 'Update' : 'Create') }}
         </button>
-        <button type="button" class="btn-ghost text-xs" @click="modal = false">Cancel</button>
+        <button type="button" class="btn-ghost text-xs" @click="modal=false">Cancel</button>
       </div>
     </form>
   </AppModal>
@@ -129,49 +137,33 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
+import { Plus, Pencil, Trash2, Loader, Save, Tag } from 'lucide-vue-next';
 import AppModal from '@/components/common/AppModal.vue';
 import { useAlertStore } from '@/stores/alertStore.js';
 import api from '@/composables/useApi.js';
 
-const alert         = useAlertStore();
-const events        = ref([]);
-const categories    = ref([]);
-const selectedEvent = ref('');
-const saving        = ref(false);
-const modal         = ref(false);
-const editing       = ref(null);
-
+const alert      = useAlertStore();
+const categories = ref([]);
+const saving     = ref(false);
+const modal      = ref(false);
+const editing    = ref(null);
 const form = reactive({ name:'', description:'', color:'#02462E', capacity:'', sort_order:0, is_active:1 });
 const errs = reactive({ name:'' });
 
-onMounted(async () => {
-  const { data } = await api.get('/events');
-  events.value = data.data || [];
-  // auto-select active event
-  const active = events.value.find(e => e.status === 'active');
-  if (active) { selectedEvent.value = active.id; load(); }
-});
-
 const load = async () => {
-  if (!selectedEvent.value) { categories.value = []; return; }
-  try {
-    const { data } = await api.get(`/events/${selectedEvent.value}/categories`);
-    categories.value = data.data || [];
-  } catch { alert.error('Failed to load categories.'); }
+  try { const { data } = await api.get('/categories'); categories.value = data.data || []; }
+  catch { alert.error('Failed to load categories.'); }
 };
 
-const resetForm = () => {
-  Object.assign(form, { name:'', description:'', color:'#02462E', capacity:'', sort_order:0, is_active:1 });
-  errs.name = '';
-};
+onMounted(load);
 
-const openCreate = () => { editing.value = null; resetForm(); modal.value = true; };
-const openEdit   = (c) => {
-  editing.value = c.id;
+const resetForm = () => { Object.assign(form, { name:'', description:'', color:'#02462E', capacity:'', sort_order:0, is_active:1 }); errs.name=''; };
+const openCreate = () => { editing.value=null; resetForm(); modal.value=true; };
+const openEdit   = (c)  => {
+  editing.value=c.id;
   Object.assign(form, { name:c.name, description:c.description||'', color:c.color,
     capacity:c.capacity||'', sort_order:c.sort_order, is_active:c.is_active });
-  errs.name = '';
-  modal.value = true;
+  modal.value=true;
 };
 
 const save = async () => {
@@ -180,23 +172,16 @@ const save = async () => {
   saving.value = true;
   try {
     const payload = { ...form, capacity: form.capacity || null };
-    if (editing.value) {
-      await api.put(`/categories/${editing.value}`, payload);
-      alert.success('Category updated.');
-    } else {
-      await api.post(`/events/${selectedEvent.value}/categories`, payload);
-      alert.success('Category created.');
-    }
+    if (editing.value) { await api.put(`/categories/${editing.value}`, payload); alert.success('Updated.'); }
+    else               { await api.post('/categories', payload);               alert.success('Created.'); }
     modal.value = false; load();
   } catch (err) { alert.error(err.response?.data?.message || 'Failed.'); }
   finally { saving.value = false; }
 };
 
 const remove = async (c) => {
-  if (!confirm(`Delete category "${c.name}"?`)) return;
-  try {
-    await api.delete(`/categories/${c.id}`);
-    alert.success('Category deleted.'); load();
-  } catch (err) { alert.error(err.response?.data?.message || 'Delete failed.'); }
+  if (!confirm(`Delete "${c.name}"?`)) return;
+  try { await api.delete(`/categories/${c.id}`); alert.success('Deleted.'); load(); }
+  catch (err) { alert.error(err.response?.data?.message || 'Delete failed.'); }
 };
 </script>

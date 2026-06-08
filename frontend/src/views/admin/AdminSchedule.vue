@@ -14,8 +14,17 @@
         <p v-if="event" class="text-sm text-gray-500">{{ event.title }}</p>
       </div>
       <div class="flex gap-2 flex-wrap">
-        <button class="btn-outline text-xs" @click="cloneModal = true">📋 Copy From Event</button>
-        <button class="btn-green text-xs" @click="openCreate">+ Add Entry</button>
+        <button class="btn-outline text-xs" @click="cloneModal=true">
+          <Copy :size="14" /> Copy From Event
+        </button>
+        <button v-if="schedule.length" class="btn-outline text-xs border-brand-gold text-brand-gold hover:bg-brand-gold hover:text-brand-green"
+          @click="sendReminders" :disabled="reminding">
+          <component :is="reminding ? Loader : Bell" :size="14" :class="reminding?'animate-spin':''" />
+          {{ reminding ? 'Sending…' : 'Email Facilitators' }}
+        </button>
+        <button class="btn-green text-xs" @click="openCreate">
+          <Plus :size="14" /> Add Entry
+        </button>
       </div>
     </div>
 
@@ -194,6 +203,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
+import { Plus, Loader, Bell, Copy } from 'lucide-vue-next';
 import AppModal from '@/components/common/AppModal.vue';
 import { useAlertStore } from '@/stores/alertStore.js';
 import api from '@/composables/useApi.js';
@@ -309,7 +319,18 @@ const remove = async (id) => {
   } catch { alert.error('Delete failed.'); }
 };
 
-const doClone = async () => {
+const reminding = ref(false);
+
+const sendReminders = async () => {
+  if (!confirm('Send email reminders to all facilitators listed in this schedule?')) return;
+  reminding.value = true;
+  try {
+    const { data } = await api.post(`/events/${eventId}/schedule/remind`);
+    const { sent, failed, skipped } = data.data || {};
+    alert.success(`Reminders sent: ${sent} delivered, ${failed||0} failed, ${skipped||0} skipped (no email found).`);
+  } catch (err) { alert.error(err.response?.data?.message || 'Reminder send failed.'); }
+  finally { reminding.value = false; }
+};
   if (!cloneSource.value) return;
   cloning.value = true;
   try {

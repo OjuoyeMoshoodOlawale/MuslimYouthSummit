@@ -218,7 +218,7 @@ const loadEventData = async () => {
   try {
     const [ttRes, catRes] = await Promise.all([
       api.get(`/events/${form.event_id}/ticket-types`),
-      api.get(`/events/${form.event_id}/categories`),
+      api.get(`/categories`),
     ]);
     ticketTypes.value = ttRes.data.data||[];
     categories.value  = (catRes.data.data||[]).filter(c=>c.is_active);
