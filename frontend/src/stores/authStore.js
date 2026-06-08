@@ -8,9 +8,10 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(false);
 
   const isAuthenticated = computed(() => !!token.value && !!admin.value);
-  const isSuperAdmin = computed(() => admin.value?.role === 'super_admin');
-  const isAdmin = computed(() => ['super_admin', 'admin'].includes(admin.value?.role));
-  const isAttendant = computed(() => admin.value?.role === 'attendant');
+  const isSuperAdmin   = computed(() => admin.value?.role === 'super_admin');
+  const isAdmin        = computed(() => ['super_admin', 'admin'].includes(admin.value?.role));
+  const isAttendant    = computed(() => admin.value?.role === 'attendant');
+  const isDepartment   = computed(() => admin.value?.role === 'department');
 
   const login = async (email, password) => {
     loading.value = true;
@@ -45,5 +46,5 @@ export const useAuthStore = defineStore('auth', () => {
     }
   };
 
-  return { token, admin, loading, isAuthenticated, isSuperAdmin, isAdmin, isAttendant, login, logout, fetchMe };
+  return { token, admin, loading, isAuthenticated, isSuperAdmin, isAdmin, isAttendant, isDepartment, login, logout, fetchMe };
 });

@@ -55,7 +55,7 @@ import { useAuthStore } from '@/stores/authStore.js';
 import {
   LayoutDashboard, TrendingUp, FileBarChart2, CalendarDays, Tag, ShieldCheck,
   Ticket, Image, Users, Mail, Key, ChevronLeft, ChevronRight, LogOut, Tags,
-  UserPlus, BedDouble,
+  UserPlus, BedDouble, Building2, ReceiptText,
 } from 'lucide-vue-next';
 
 defineProps({ collapsed: { type: Boolean, default: false } });
@@ -103,7 +103,9 @@ const allSections = [
   {
     label: 'System',
     links: [
-      { to:'/admin/admins', label:'Admin Users', icon:Key, roles:['super_admin'] },
+      { to:'/admin/departments', label:'Departments',      icon:Building2, roles:['super_admin','admin'] },
+      { to:'/admin/expenses',    label:'Expense Requests', icon:ReceiptText, roles:['super_admin','admin','department'] },
+      { to:'/admin/admins',      label:'Admin Users',      icon:Key,       roles:['super_admin'] },
     ],
   },
 ];

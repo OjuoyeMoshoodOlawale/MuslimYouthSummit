@@ -43,6 +43,8 @@ const titles = {
   'admin-attendance':      'Attendance',
   'admin-gallery':         'Gallery',
   'admin-participants':    'Participants',
+  'admin-departments':     'Departments',
+  'admin-expenses':        'Expense Requests',
   'admin-ticket-types':    'Ticket Pricing',
   'admin-hostels':         'Hostels',
   'admin-email':           'Email Campaigns',

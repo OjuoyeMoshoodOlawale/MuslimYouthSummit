@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS admins (
   name        VARCHAR(120) NOT NULL,
   email       VARCHAR(191) NOT NULL UNIQUE,
   password    VARCHAR(255) NOT NULL,
-  role        ENUM('super_admin','admin','attendant') NOT NULL DEFAULT 'admin',
+  role        ENUM('super_admin','admin','attendant','department') NOT NULL DEFAULT 'admin',
+  department_id INT UNSIGNED NULL COMMENT 'Set for department role users',
   is_active   TINYINT(1) NOT NULL DEFAULT 1,
   last_login  DATETIME,
   created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -393,3 +394,59 @@ CREATE INDEX idx_hostel_event    ON hostel_assignments(event_id, hostel_id);
 --   NOT NULL DEFAULT 'all' AFTER name;
 -- ALTER TABLE ticket_types ADD COLUMN description VARCHAR(200) NULL AFTER participant_category;
 -- ALTER TABLE ticket_types ADD COLUMN sort_order TINYINT UNSIGNED NOT NULL DEFAULT 0;
+
+-- =============================================================
+-- PHASE 5: Departments & Expense Requests
+-- =============================================================
+
+-- Departments (Kitchen, Gate, AV, Transport, etc.)
+CREATE TABLE IF NOT EXISTS departments (
+  id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name        VARCHAR(120) NOT NULL UNIQUE,
+  description TEXT,
+  head_name   VARCHAR(120),
+  is_active   TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order  TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- Add department role to admins + department FK
+-- ALTER TABLE admins ADD COLUMN department_id INT UNSIGNED NULL;
+-- ALTER TABLE admins MODIFY role ENUM('super_admin','admin','attendant','department') NOT NULL DEFAULT 'admin';
+  department_id INT UNSIGNED NULL COMMENT 'Set for department role users',
+-- ALTER TABLE admins ADD FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL;
+
+-- Expense requests (raised by departments, approved by admin)
+CREATE TABLE IF NOT EXISTS expense_requests (
+  id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  department_id   INT UNSIGNED NOT NULL,
+  event_id        INT UNSIGNED,
+  title           VARCHAR(200) NOT NULL,
+  description     TEXT,
+  amount_requested DECIMAL(12,2) NOT NULL,
+  amount_approved  DECIMAL(12,2),
+  amount_paid      DECIMAL(12,2),
+  status          ENUM('pending','approved','rejected','paid') NOT NULL DEFAULT 'pending',
+  priority        ENUM('low','normal','urgent') NOT NULL DEFAULT 'normal',
+  -- who did what
+  raised_by       INT UNSIGNED NOT NULL,
+  approved_by     INT UNSIGNED,
+  paid_by         INT UNSIGNED,
+  -- notes
+  raise_note      TEXT COMMENT 'Submitted by department',
+  approve_note    TEXT COMMENT 'Admin approval/rejection note',
+  pay_note        TEXT COMMENT 'Payment reference or note',
+  -- timestamps
+  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  approved_at     DATETIME,
+  paid_at         DATETIME,
+  due_date        DATE COMMENT 'When the department needs the funds by',
+  FOREIGN KEY (department_id) REFERENCES departments(id),
+  FOREIGN KEY (event_id)      REFERENCES events(id) ON DELETE SET NULL,
+  FOREIGN KEY (raised_by)     REFERENCES admins(id),
+  FOREIGN KEY (approved_by)   REFERENCES admins(id) ON DELETE SET NULL,
+  FOREIGN KEY (paid_by)       REFERENCES admins(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_expenses_status     ON expense_requests(status, created_at DESC);
+CREATE INDEX idx_expenses_dept       ON expense_requests(department_id, status);

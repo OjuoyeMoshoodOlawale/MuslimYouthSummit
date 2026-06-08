@@ -35,7 +35,7 @@
     </DataTable>
   </div>
 
-  <AppModal v-model="createModal" title="Add Admin" size="md">
+  <AppModal v-model="createModal" title="Add Admin / Department Staff" size="md">
     <form class="space-y-4" @submit.prevent="save">
       <div><label class="label">Full Name *</label><input v-model="form.name" class="input" /></div>
       <div><label class="label">Email *</label><input v-model="form.email" type="email" class="input" /></div>
@@ -43,13 +43,25 @@
         <label class="label">Role *</label>
         <select v-model="form.role" class="input">
           <option value="admin">Admin</option>
-          <option value="attendant">Attendant</option>
+          <option value="attendant">Attendant (check-in only)</option>
+          <option value="department">Department Staff (expense requests)</option>
           <option value="super_admin">Super Admin</option>
         </select>
       </div>
+      <!-- Department selector (required when role = department) -->
+      <div v-if="form.role === 'department'">
+        <label class="label">Department *</label>
+        <select v-model="form.department_id" class="input">
+          <option value="">Select department…</option>
+          <option v-for="d in departments" :key="d.id" :value="d.id">{{ d.name }}</option>
+        </select>
+        <p class="text-xs text-gray-400 mt-1">
+          This user can only raise and manage expense requests for the selected department.
+        </p>
+      </div>
       <div><label class="label">Password *</label><input v-model="form.password" type="password" class="input" placeholder="Min 8 characters" /></div>
       <div class="flex gap-2 pt-2">
-        <button type="submit" :disabled="saving" class="btn-green text-xs">Create Admin</button>
+        <button type="submit" :disabled="saving" class="btn-green text-xs">Create Account</button>
         <button type="button" class="btn-ghost text-xs" @click="createModal = false">Cancel</button>
       </div>
     </form>
@@ -65,10 +77,11 @@ import api from '@/composables/useApi.js';
 
 const alert  = useAlertStore();
 const admins  = ref([]);
+const departments = ref([]);
 const loading = ref(false);
 const saving  = ref(false);
 const createModal = ref(false);
-const form = reactive({ name:'', email:'', role:'admin', password:'' });
+const form = reactive({ name:'', email:'', role:'admin', password:'', department_id:'' });
 
 const cols = [
   { key:'name',       label:'Admin'   },
@@ -84,7 +97,10 @@ const load = async () => {
   finally { loading.value = false; }
 };
 
-onMounted(load);
+onMounted(async () => {
+  load();
+  try { const { data } = await api.get('/departments'); departments.value = data.data || []; } catch {}
+});
 
 const fmt = (d) => d ? new Date(d).toLocaleDateString('en-NG',{day:'numeric',month:'short',year:'numeric'}) : '—';
 const roleClass = (r) => ({
@@ -96,7 +112,7 @@ const roleClass = (r) => ({
 const save = async () => {
   saving.value = true;
   try {
-    await api.post('/auth/admins', form);
+    await api.post('/auth/admins', { ...form, department_id: form.department_id || null });
     alert.success('Admin created.'); createModal.value = false;
     Object.assign(form, { name:'', email:'', role:'admin', password:'' });
     load();

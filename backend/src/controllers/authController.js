@@ -1,118 +1,132 @@
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 import { query } from '../database/db.js';
-import { success, created, error, notFound as notFoundRes } from '../utils/response.js';
-import { signToken } from '../middleware/auth.js';
+import { success, error, notFound, created } from '../utils/response.js';
 
-/* ── Login ──────────────────────────────────────────────────── */
+/* ── Login ────────────────────────────────────────────────── */
 export const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) return error(res, 'Email and password are required.', 400);
 
-    const [rows] = await query(
-      'SELECT * FROM admins WHERE email = ? AND is_active = 1',
-      [email.trim().toLowerCase()]
+    const [admins] = await query(
+      `SELECT a.*, d.name AS department_name
+       FROM admins a
+       LEFT JOIN departments d ON d.id = a.department_id
+       WHERE a.email = ? AND a.is_active = 1`,
+      [email.toLowerCase()]
     );
+    if (!admins.length) return error(res, 'Invalid email or password.', 401);
 
-    if (!rows.length) return error(res, 'Invalid email or password.', 401);
-
-    const admin = rows[0];
-    // Schema column is `password` (not password_hash)
+    const admin = admins[0];
     const match = await bcrypt.compare(password, admin.password);
     if (!match) return error(res, 'Invalid email or password.', 401);
 
+    // Update last login
     await query('UPDATE admins SET last_login = NOW() WHERE id = ?', [admin.id]);
 
+    const payload = {
+      id:            admin.id,
+      email:         admin.email,
+      name:          admin.name,
+      role:          admin.role,
+      department_id: admin.department_id,
+    };
+
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRES_IN || '8h',
+    });
+
     return success(res, {
-      token: signToken(admin),
-      admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role },
-    }, 'Logged in successfully.');
-  } catch (e) { next(e); }
+      token,
+      admin: {
+        ...payload,
+        department_name: admin.department_name,
+      },
+    });
+  } catch (err) { next(err); }
 };
 
-/* ── Get current admin ──────────────────────────────────────── */
+/* ── Get current admin ─────────────────────────────────────── */
 export const getMe = async (req, res, next) => {
   try {
-    const [rows] = await query(
-      'SELECT id, name, email, role, is_active, created_at FROM admins WHERE id = ?',
+    const [admins] = await query(
+      `SELECT a.id, a.name, a.email, a.role, a.department_id, a.is_active, a.created_at,
+              d.name AS department_name
+       FROM admins a
+       LEFT JOIN departments d ON d.id = a.department_id
+       WHERE a.id = ?`,
       [req.admin.id]
     );
-    if (!rows.length) return notFoundRes(res, 'Admin');
-    return success(res, rows[0]);
-  } catch (e) { next(e); }
+    if (!admins.length) return notFound(res, 'Admin');
+    return success(res, admins[0]);
+  } catch (err) { next(err); }
 };
 
-/* ── Create admin (super_admin only) ────────────────────────── */
+/* ── Create admin ──────────────────────────────────────────── */
 export const createAdmin = async (req, res, next) => {
   try {
-    const { name, email, password, role = 'admin' } = req.body;
-    if (!name?.trim() || !email?.trim() || !password)
-      return error(res, 'Name, email and password are required.', 400);
-    if (password.length < 8)
-      return error(res, 'Password must be at least 8 characters.', 400);
-    if (!['super_admin','admin','attendant'].includes(role))
-      return error(res, 'Invalid role.', 400);
+    const { name, email, password, role, department_id } = req.body;
 
-    const [existing] = await query('SELECT id FROM admins WHERE email = ?',
-      [email.trim().toLowerCase()]);
-    if (existing.length) return error(res, 'An admin with this email already exists.', 409);
+    // Department role requires a department
+    if (role === 'department' && !department_id)
+      return error(res, 'A department must be assigned for department role.', 400);
+
+    const [existing] = await query('SELECT id FROM admins WHERE email = ?', [email.toLowerCase()]);
+    if (existing.length) return error(res, 'An account with this email already exists.', 409);
 
     const hash = await bcrypt.hash(password, 12);
-    const [result] = await query(
-      'INSERT INTO admins (name, email, password, role) VALUES (?, ?, ?, ?)',
-      [name.trim(), email.trim().toLowerCase(), hash, role]
+    const [r] = await query(
+      'INSERT INTO admins (name, email, password, role, department_id) VALUES (?,?,?,?,?)',
+      [name.trim(), email.toLowerCase(), hash, role || 'admin', department_id || null]
     );
-
-    return created(res,
-      { id: result.insertId, name: name.trim(), email: email.trim().toLowerCase(), role },
-      'Admin account created.'
-    );
-  } catch (e) { next(e); }
+    return created(res, { id: r.insertId }, 'Admin account created.');
+  } catch (err) { next(err); }
 };
 
-/* ── List admins ────────────────────────────────────────────── */
+/* ── List admins ───────────────────────────────────────────── */
 export const listAdmins = async (req, res, next) => {
   try {
     const [rows] = await query(
-      'SELECT id, name, email, role, is_active, created_at FROM admins ORDER BY role, name'
+      `SELECT a.id, a.name, a.email, a.role, a.is_active, a.department_id, a.created_at,
+              d.name AS department_name
+       FROM admins a
+       LEFT JOIN departments d ON d.id = a.department_id
+       ORDER BY a.role, a.name`
     );
     return success(res, rows);
   } catch (e) { next(e); }
 };
 
-/* ── Update admin ───────────────────────────────────────────── */
+/* ── Update admin ──────────────────────────────────────────── */
 export const updateAdmin = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, email, role, is_active } = req.body;
+    const { name, email, role, is_active, department_id } = req.body;
+
     const [existing] = await query('SELECT id FROM admins WHERE id = ?', [id]);
-    if (!existing.length) return notFoundRes(res, 'Admin');
+    if (!existing.length) return notFound(res, 'Admin');
 
     await query(
-      'UPDATE admins SET name=?, email=?, role=?, is_active=? WHERE id=?',
-      [name, email?.toLowerCase(), role, is_active ? 1 : 0, id]
+      'UPDATE admins SET name=?, email=?, role=?, is_active=?, department_id=? WHERE id=?',
+      [name, email?.toLowerCase(), role, is_active ? 1 : 0, department_id || null, id]
     );
     return success(res, null, 'Admin updated.');
   } catch (e) { next(e); }
 };
 
-/* ── Change password ────────────────────────────────────────── */
+/* ── Change password ───────────────────────────────────────── */
 export const changePassword = async (req, res, next) => {
   try {
     const { current_password, new_password } = req.body;
-    if (!current_password || !new_password)
-      return error(res, 'Both current and new passwords are required.', 400);
-    if (new_password.length < 8)
+    if (!new_password || new_password.length < 8)
       return error(res, 'New password must be at least 8 characters.', 400);
 
-    const [rows] = await query('SELECT password FROM admins WHERE id = ?', [req.admin.id]);
-    if (!rows.length) return notFoundRes(res, 'Admin');
-
-    const match = await bcrypt.compare(current_password, rows[0].password);
-    if (!match) return error(res, 'Current password is incorrect.', 400);
+    const [[admin]] = await query('SELECT password FROM admins WHERE id=?', [req.admin.id]);
+    const match = await bcrypt.compare(current_password, admin.password);
+    if (!match) return error(res, 'Current password is incorrect.', 401);
 
     const hash = await bcrypt.hash(new_password, 12);
-    await query('UPDATE admins SET password = ? WHERE id = ?', [hash, req.admin.id]);
+    await query('UPDATE admins SET password=? WHERE id=?', [hash, req.admin.id]);
     return success(res, null, 'Password changed successfully.');
   } catch (e) { next(e); }
 };

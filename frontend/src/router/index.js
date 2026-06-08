@@ -15,6 +15,8 @@ const AdminEvents      = () => import('@/views/admin/AdminEvents.vue');
 const AdminManualRegister = () => import('@/views/admin/AdminManualRegister.vue');
 const AdminHostels        = () => import('@/views/admin/AdminHostels.vue');
 const AdminTicketTypes    = () => import('@/views/admin/AdminTicketTypes.vue');
+const AdminDepartments    = () => import('@/views/admin/AdminDepartments.vue');
+const AdminExpenses       = () => import('@/views/admin/AdminExpenses.vue');
 const CreateEvent      = () => import('@/views/admin/CreateEvent.vue');
 const EventDetail      = () => import('@/views/admin/EventDetail.vue');
 const AdminSchedule    = () => import('@/views/admin/AdminSchedule.vue');
@@ -70,6 +72,10 @@ const routes = [
         meta: { roles: ['super_admin','admin'] } },
       { path: 'admins',            name: 'admin-admins',          component: AdminAdmins,
         meta: { roles: ['super_admin'] } },
+      { path: 'departments',       name: 'admin-departments',     component: AdminDepartments,
+        meta: { roles: ['super_admin','admin'] } },
+      { path: 'expenses',          name: 'admin-expenses',        component: AdminExpenses,
+        meta: { roles: ['super_admin','admin','department'] } },
       { path: 'register',          name: 'admin-manual-register', component: AdminManualRegister,
         meta: { roles: ['super_admin','admin'] } },
       { path: 'hostels',            name: 'admin-hostels',           component: AdminHostels,
@@ -91,11 +97,15 @@ const router = createRouter({
 
 router.beforeEach((to, _from, next) => {
   const auth = useAuthStore();
-  if (to.meta.guestOnly && auth.isAuthenticated) return next('/admin/dashboard');
+  if (to.meta.guestOnly && auth.isAuthenticated) {
+    // Department staff go straight to expenses
+    const dest = auth.admin?.role === 'department' ? '/admin/expenses' : '/admin/dashboard';
+    return next(dest);
+  }
   if (to.meta.requiresAuth && !auth.isAuthenticated)
     return next({ name: 'admin-login', query: { redirect: to.fullPath } });
   if (to.meta.roles && auth.isAuthenticated && !to.meta.roles.includes(auth.admin?.role))
-    return next('/admin/dashboard');
+    return next(auth.admin?.role === 'department' ? '/admin/expenses' : '/admin/dashboard');
   next();
 });
 
