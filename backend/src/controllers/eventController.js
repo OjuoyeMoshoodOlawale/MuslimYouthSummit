@@ -47,35 +47,47 @@ export const getPublicEvents = async (req, res, next) => {
 // ── Get Past Events ─────────────────────────────────────────
 export const getPastEvents = async (req, res, next) => {
   try {
-    const includeGallery = req.query.include_gallery === '1';
+    const inc  = (req.query.include || '').split(',').map(s => s.trim());
+    const withGallery  = inc.includes('gallery')  || req.query.include_gallery === '1';
+    const withLectures = inc.includes('lectures');
+    const withSpeakers = inc.includes('speakers');
 
     const [events] = await query(
-      `SELECT e.id, e.title, e.tagline, e.edition,
-              e.start_date, e.end_date, e.venue, e.cover_image_url,
-              COUNT(DISTINCT t.id)  AS total_participants,
-              COUNT(DISTINCT g.id)  AS gallery_count
+      `SELECT e.*,
+              COUNT(DISTINCT t.id) AS total_participants,
+              COUNT(DISTINCT g.id) AS gallery_count
        FROM events e
        LEFT JOIN tickets t ON t.event_id = e.id AND t.status = 'paid'
        LEFT JOIN event_gallery g ON g.event_id = e.id
        WHERE e.status IN ('completed','archived')
-       GROUP BY e.id
-       ORDER BY e.start_date DESC`
+       GROUP BY e.id ORDER BY e.start_date DESC`
     );
 
-    if (includeGallery && events.length) {
-      for (const ev of events) {
+    for (const ev of events) {
+      if (withGallery) {
         const [imgs] = await query(
-          'SELECT id, image_url, thumbnail_url, caption FROM event_gallery WHERE event_id = ? ORDER BY sort_order LIMIT 20',
+          'SELECT id, image_url, thumbnail_url, caption FROM event_gallery WHERE event_id=? ORDER BY sort_order LIMIT 20',
           [ev.id]
         );
         ev.gallery = imgs;
       }
+      if (withLectures) {
+        const [days] = await query('SELECT * FROM event_days WHERE event_id=? ORDER BY day_number', [ev.id]);
+        const [lecs] = await query(
+          'SELECT id, event_day_id, s_n, title, lecture_type, start_time, end_time, main_speaker_name, facilitators FROM lectures WHERE event_id=? ORDER BY event_day_id, sort_order, start_time',
+          [ev.id]
+        );
+        ev.days = days; ev.lectures = lecs;
+      }
+      if (withSpeakers) {
+        const [spks] = await query(
+          'SELECT id, name, title, bio, photo_url FROM speakers WHERE event_id=? ORDER BY sort_order', [ev.id]
+        );
+        ev.speakers = spks;
+      }
     }
-
     return success(res, events);
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };
 
 // ── Get Single Event ────────────────────────────────────────
@@ -532,14 +544,30 @@ async function enrichEvent(eventId, event) {
     [eventId]
   );
 
-  const [[stats]] = await query(
-    `SELECT
-       COUNT(*) AS total_sold,
-       SUM(amount_paid) AS total_revenue,
-       SUM(CASE WHEN balance_due > 0 THEN 1 ELSE 0 END) AS partial_payments
-     FROM tickets WHERE event_id = ? AND status = 'paid'`,
-    [eventId]
-  );
+  // Stats — defensive: handle case where balance_due column doesn't exist yet
+  let stats = { total_sold: 0, total_revenue: 0, partial_payments: 0 };
+  try {
+    const [[s]] = await query(
+      `SELECT
+         SUM(status='paid') AS total_sold,
+         SUM(CASE WHEN status='paid' THEN amount_paid ELSE 0 END) AS total_revenue,
+         SUM(CASE WHEN status='paid' AND balance_due > 0 THEN 1 ELSE 0 END) AS partial_payments
+       FROM tickets WHERE event_id = ?`,
+      [eventId]
+    );
+    stats = s || stats;
+  } catch {
+    // balance_due column may not exist on older DBs — run migrate.sql
+    try {
+      const [[s]] = await query(
+        `SELECT SUM(status='paid') AS total_sold,
+                SUM(CASE WHEN status='paid' THEN amount_paid ELSE 0 END) AS total_revenue
+         FROM tickets WHERE event_id = ?`,
+        [eventId]
+      );
+      stats = { ...stats, ...s };
+    } catch {}
+  }
 
   return { ...event, days, lectures, speakers, ticketTypes, stats };
 }
