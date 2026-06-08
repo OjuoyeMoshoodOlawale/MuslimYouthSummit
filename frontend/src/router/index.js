@@ -27,6 +27,7 @@ const AdminParticipants= () => import('@/views/admin/AdminParticipants.vue');
 const AdminEmail       = () => import('@/views/admin/AdminEmail.vue');
 const AdminTags        = () => import('@/views/admin/AdminTags.vue');
 const AdminReports     = () => import('@/views/admin/AdminReports.vue');
+const AdminAdmins      = () => import('@/views/admin/AdminAdmins.vue');
 
 const routes = [
   { path: '/',             name: 'home',     component: Landing },
