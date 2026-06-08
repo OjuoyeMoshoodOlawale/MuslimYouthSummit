@@ -111,8 +111,8 @@
         </div>
         <div>
           <label class="label">Beds <span class="text-red-500">*</span></label>
-          <input v-model.number="form.beds" type="number" min="1" class="input" :class="{'input-error':errs."beds"}" placeholder="50" />
-          <p v-if="errs."beds"" class="text-red-500 text-xs mt-1">{{ errs."beds" }}</p>
+          <input v-model.number="form.beds" type="number" min="1" class="input" :class="{'input-error':errs.beds}" placeholder="50" />
+          <p v-if="errs.beds" class="text-red-500 text-xs mt-1">{{ errs.beds }}</p>
         </div>
       </div>
       <div>
@@ -207,8 +207,8 @@ const openEdit   = (h)  => {
 
 const validate = () => {
   errs.name     = form.name.trim()       ? '' : 'Name is required.';
-  errs."beds" = form.beds >= 1     ? '' : 'Beds must be at least 1.';
-  return !errs.name && !errs."beds";
+  errs.beds = form.beds >= 1     ? '' : 'Beds must be at least 1.';
+  return !errs.name && !errs.beds;
 };
 
 const save = async () => {

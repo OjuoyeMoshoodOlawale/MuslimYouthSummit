@@ -149,8 +149,8 @@ export const dashboardSnapshot = async (req, res, next) => {
       `SELECT c.name, c.color, c.capacity,
               COUNT(t.id) AS registered
        FROM event_categories c
-       LEFT JOIN tickets t ON t.category_id=c.id AND t.status='paid'
-       WHERE c.event_id=? AND c.is_active=1
+       LEFT JOIN tickets t ON t.category_id=c.id AND t.status='paid' AND t.event_id=?
+       WHERE c.is_active=1
        GROUP BY c.id ORDER BY c.sort_order`,
       [eventId]
     );

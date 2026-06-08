@@ -1,7 +1,7 @@
 -- =============================================================
--- MYS PLATFORM — DATABASE SCHEMA (CLEAN CONSOLIDATED)
+-- MYS PLATFORM — DATABASE SCHEMA v4 (DEFINITIVE)
 -- Muslim Youth Summit Event Management System
--- Run once on a fresh database.
+-- Always drop and re-run this for a clean install.
 -- =============================================================
 
 CREATE DATABASE IF NOT EXISTS mys_platform
@@ -11,7 +11,7 @@ USE mys_platform;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- =============================================================
--- 1. DEPARTMENTS  (must come before admins for the FK)
+-- 1. DEPARTMENTS  (before admins for FK)
 -- =============================================================
 CREATE TABLE IF NOT EXISTS departments (
   id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -31,10 +31,8 @@ CREATE TABLE IF NOT EXISTS admins (
   name            VARCHAR(120) NOT NULL,
   email           VARCHAR(191) NOT NULL UNIQUE,
   password        VARCHAR(255) NOT NULL,
-  role            ENUM('super_admin','admin','attendant','department')
-                  NOT NULL DEFAULT 'admin',
-  department_id   INT UNSIGNED NULL
-                  COMMENT 'Required when role = department',
+  role            ENUM('super_admin','admin','attendant','department') NOT NULL DEFAULT 'admin',
+  department_id   INT UNSIGNED NULL COMMENT 'Required when role=department',
   is_active       TINYINT(1) NOT NULL DEFAULT 1,
   last_login      DATETIME,
   created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -49,13 +47,13 @@ CREATE TABLE IF NOT EXISTS events (
   id                   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   title                VARCHAR(200) NOT NULL,
   edition              VARCHAR(20)  NOT NULL COMMENT 'e.g. MYS3 — used in ticket numbers',
+  ticket_prefix        VARCHAR(10)  NULL     COMMENT 'Override prefix for ticket numbers e.g. MYS3-25. NULL = use edition',
   slug                 VARCHAR(220) NOT NULL UNIQUE,
   tagline              VARCHAR(300),
   description          TEXT,
   venue                VARCHAR(300),
   venue_address        TEXT,
-  status               ENUM('draft','active','completed','archived')
-                       NOT NULL DEFAULT 'draft',
+  status               ENUM('draft','active','completed','archived') NOT NULL DEFAULT 'draft',
   start_date           DATE NOT NULL,
   end_date             DATE NOT NULL,
   early_bird_closes_at DATETIME     COMMENT 'Early bird pricing ends at this datetime',
@@ -67,12 +65,12 @@ CREATE TABLE IF NOT EXISTS events (
 ) ENGINE=InnoDB;
 
 -- =============================================================
--- 4. EVENT DAYS  (multi-day schedule)
+-- 4. EVENT DAYS
 -- =============================================================
 CREATE TABLE IF NOT EXISTS event_days (
   id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   event_id    INT UNSIGNED NOT NULL,
-  day_number  TINYINT UNSIGNED NOT NULL COMMENT '1, 2, 3 …',
+  day_number  TINYINT UNSIGNED NOT NULL,
   event_date  DATE NOT NULL,
   theme       VARCHAR(200),
   description TEXT,
@@ -83,68 +81,61 @@ CREATE TABLE IF NOT EXISTS event_days (
 
 -- =============================================================
 -- 5. SPEAKERS
--- NOTE: event_id is nullable — speaker can be global or event-specific
 -- =============================================================
 CREATE TABLE IF NOT EXISTS speakers (
   id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  event_id    INT UNSIGNED NULL
-              COMMENT 'NULL = global speaker reusable across events',
+  event_id    INT UNSIGNED NULL COMMENT 'NULL = global reusable speaker',
   name        VARCHAR(150) NOT NULL,
-  title       VARCHAR(200) COMMENT 'e.g. Sheikh, Dr., CEO',
+  title       VARCHAR(200) COMMENT 'e.g. Sheikh, Dr., Engr.',
   bio         TEXT,
   photo_url   VARCHAR(500),
+  email       VARCHAR(191) NULL COMMENT 'Contact email for future events',
+  phone       VARCHAR(30)  NULL COMMENT 'Contact phone for future events',
   sort_order  TINYINT UNSIGNED NOT NULL DEFAULT 0,
   created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- =============================================================
--- 6. LECTURES / SESSIONS  (event schedule)
+-- 6. LECTURES / SESSIONS
 -- =============================================================
 CREATE TABLE IF NOT EXISTS lectures (
   id                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   event_id          INT UNSIGNED NOT NULL,
   event_day_id      INT UNSIGNED NULL,
-  s_n               SMALLINT UNSIGNED NOT NULL DEFAULT 0
-                    COMMENT 'Display sequence number (S/N column)',
+  s_n               SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Display sequence number',
   title             VARCHAR(300) NOT NULL,
   description       TEXT,
-  lecture_type      ENUM('lecture','panel','workshop','keynote','prayer','break','other')
-                    NOT NULL DEFAULT 'lecture',
-  main_speaker_name VARCHAR(150) NULL
-                    COMMENT 'Denormalised speaker name for quick display',
-  facilitators      TEXT NULL
-                    COMMENT 'Comma-separated facilitator names',
+  lecture_type      ENUM('lecture','panel','workshop','keynote','prayer','break','other') NOT NULL DEFAULT 'lecture',
+  main_speaker_name VARCHAR(150) NULL,
+  facilitators      TEXT NULL COMMENT 'Comma-separated facilitator names',
   start_time        TIME,
   end_time          TIME,
+  youtube_url       VARCHAR(500) NULL COMMENT 'YouTube link uploaded after recording',
   sort_order        SMALLINT UNSIGNED NOT NULL DEFAULT 0,
   created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+  FOREIGN KEY (event_id)     REFERENCES events(id) ON DELETE CASCADE,
   FOREIGN KEY (event_day_id) REFERENCES event_days(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- Lecture ↔ Speaker (many-to-many)
 CREATE TABLE IF NOT EXISTS lecture_speakers (
   lecture_id  INT UNSIGNED NOT NULL,
   speaker_id  INT UNSIGNED NOT NULL,
   sort_order  TINYINT UNSIGNED NOT NULL DEFAULT 0,
   PRIMARY KEY (lecture_id, speaker_id),
-  FOREIGN KEY (lecture_id) REFERENCES lectures(id)  ON DELETE CASCADE,
-  FOREIGN KEY (speaker_id) REFERENCES speakers(id)  ON DELETE CASCADE
+  FOREIGN KEY (lecture_id) REFERENCES lectures(id) ON DELETE CASCADE,
+  FOREIGN KEY (speaker_id) REFERENCES speakers(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- =============================================================
--- 7. EVENT CATEGORIES  (GLOBAL — no event_id, reused each year)
+-- 7. EVENT CATEGORIES (GLOBAL — no event_id)
 -- =============================================================
 CREATE TABLE IF NOT EXISTS event_categories (
   id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  name        VARCHAR(120) NOT NULL UNIQUE
-              COMMENT 'e.g. Youth, Professionals, Brother A, Sister B',
+  name        VARCHAR(120) NOT NULL UNIQUE,
   description TEXT,
-  color       VARCHAR(7) NOT NULL DEFAULT '#02462E'
-              COMMENT 'Hex badge colour',
-  capacity    INT UNSIGNED NULL
-              COMMENT 'NULL = unlimited. Checked per-event via ticket count',
+  color       VARCHAR(7) NOT NULL DEFAULT '#02462E',
+  capacity    INT UNSIGNED NULL COMMENT 'NULL = unlimited per event',
   is_active   TINYINT(1) NOT NULL DEFAULT 1,
   sort_order  TINYINT UNSIGNED NOT NULL DEFAULT 0,
   created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -156,16 +147,11 @@ CREATE TABLE IF NOT EXISTS event_categories (
 CREATE TABLE IF NOT EXISTS ticket_types (
   id                   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   event_id             INT UNSIGNED NOT NULL,
-  name                 VARCHAR(100) NOT NULL
-                       COMMENT 'e.g. Regular – Undergraduate, VIP',
-  participant_category ENUM('all','undergraduate','graduate','professional','other')
-                       NOT NULL DEFAULT 'all'
-                       COMMENT 'Determines which group sees this price on the reg form',
-  description          VARCHAR(200) NULL
-                       COMMENT 'Short note shown on registration form',
+  name                 VARCHAR(100) NOT NULL,
+  participant_category ENUM('all','undergraduate','graduate','professional','other') NOT NULL DEFAULT 'all',
+  description          VARCHAR(200) NULL,
   regular_price        DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-  early_bird_price     DECIMAL(10,2) NULL
-                       COMMENT 'Activates automatically until event.early_bird_closes_at',
+  early_bird_price     DECIMAL(10,2) NULL,
   quantity_available   INT UNSIGNED NULL COMMENT 'NULL = unlimited',
   quantity_sold        INT UNSIGNED NOT NULL DEFAULT 0,
   is_active            TINYINT(1) NOT NULL DEFAULT 1,
@@ -176,6 +162,8 @@ CREATE TABLE IF NOT EXISTS ticket_types (
 
 -- =============================================================
 -- 9. PARTICIPANTS
+-- NOTE: No UNIQUE on email — allows family registrations.
+--       Uniqueness enforced per-ticket (unique_number) per event.
 -- =============================================================
 CREATE TABLE IF NOT EXISTS participants (
   id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -186,9 +174,11 @@ CREATE TABLE IF NOT EXISTS participants (
   occupation       VARCHAR(150),
   email_subscribed TINYINT(1) NOT NULL DEFAULT 1,
   created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_participant_email (email)
+  updated_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
+
+-- Index for fast lookup (not UNIQUE — family members can share email)
+CREATE INDEX idx_participants_email ON participants(email);
 
 -- =============================================================
 -- 10. TICKETS
@@ -198,18 +188,13 @@ CREATE TABLE IF NOT EXISTS tickets (
   event_id           INT UNSIGNED NOT NULL,
   ticket_type_id     INT UNSIGNED NOT NULL,
   participant_id     INT UNSIGNED NOT NULL,
-  category_id        INT UNSIGNED NULL
-                     COMMENT 'Assigned at registration or check-in',
-  unique_number      VARCHAR(30) NOT NULL UNIQUE
-                     COMMENT 'e.g. MYS3-0001',
-  qr_code_svg        MEDIUMTEXT NULL
-                     COMMENT 'Rendered SVG QR code',
+  category_id        INT UNSIGNED NULL COMMENT 'Assigned at check-in by admin',
+  unique_number      VARCHAR(30) NOT NULL UNIQUE COMMENT 'e.g. MYS3-25-000001',
+  qr_code_svg        MEDIUMTEXT NULL,
   amount_paid        DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-  balance_due        DECIMAL(10,2) NOT NULL DEFAULT 0.00
-                     COMMENT 'Outstanding balance for partial payments',
-  payment_method     ENUM('paystack','cash','bank_transfer','pos','waived','other')
-                     NULL COMMENT 'How the ticket was paid for',
-  payment_note       TEXT NULL COMMENT 'Reference, receipt number, or payment notes',
+  balance_due        DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  payment_method     ENUM('paystack','cash','bank_transfer','pos','waived','other') NULL,
+  payment_note       TEXT NULL,
   paystack_reference VARCHAR(100) UNIQUE NULL,
   status             ENUM('pending','paid','cancelled') NOT NULL DEFAULT 'pending',
   is_early_bird      TINYINT(1) NOT NULL DEFAULT 0,
@@ -222,7 +207,7 @@ CREATE TABLE IF NOT EXISTS tickets (
 ) ENGINE=InnoDB;
 
 -- =============================================================
--- 11. HOSTELS  (GLOBAL — permanent, reused each year)
+-- 11. HOSTELS (GLOBAL — column: beds not capacity)
 -- =============================================================
 CREATE TABLE IF NOT EXISTS hostels (
   id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -237,7 +222,6 @@ CREATE TABLE IF NOT EXISTS hostels (
   updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- Hostel assignments per event (who sleeps where)
 CREATE TABLE IF NOT EXISTS hostel_assignments (
   id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   hostel_id      INT UNSIGNED NOT NULL,
@@ -256,16 +240,15 @@ CREATE TABLE IF NOT EXISTS hostel_assignments (
 ) ENGINE=InnoDB;
 
 -- =============================================================
--- 12. EVENT TAGS  (physical entry wristbands/cards)
+-- 12. EVENT TAGS
 -- =============================================================
 CREATE TABLE IF NOT EXISTS event_tags (
   id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   event_id       INT UNSIGNED NOT NULL,
-  tag_number     VARCHAR(20) NOT NULL COMMENT 'e.g. TAG-001',
+  tag_number     VARCHAR(20) NOT NULL,
   qr_code_svg    MEDIUMTEXT NULL,
-  ticket_id      INT UNSIGNED UNIQUE NULL COMMENT 'NULL = unassigned',
-  participant_id INT UNSIGNED NULL
-                 COMMENT 'Denormalised for quick lookup at gate',
+  ticket_id      INT UNSIGNED UNIQUE NULL,
+  participant_id INT UNSIGNED NULL,
   assigned_at    DATETIME NULL,
   assigned_by    INT UNSIGNED NULL,
   is_printed     TINYINT(1) NOT NULL DEFAULT 0,
@@ -284,18 +267,18 @@ CREATE TABLE IF NOT EXISTS attendance (
   id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   event_id       INT UNSIGNED NOT NULL,
   ticket_id      INT UNSIGNED NOT NULL,
-  tag_id         INT UNSIGNED NULL COMMENT 'event_tags.id',
-  day_id         INT UNSIGNED NULL COMMENT 'event_days.id — NULL = all-day / no specific day',
+  tag_id         INT UNSIGNED NULL,
+  day_id         INT UNSIGNED NULL,
   checked_in_at  DATETIME NULL,
   checked_out_at DATETIME NULL,
-  check_in_by    INT UNSIGNED NULL COMMENT 'Admin/attendant who scanned in',
+  check_in_by    INT UNSIGNED NULL,
   check_out_by   INT UNSIGNED NULL,
   notes          TEXT NULL,
-  FOREIGN KEY (event_id)    REFERENCES events(id),
-  FOREIGN KEY (ticket_id)   REFERENCES tickets(id),
-  FOREIGN KEY (tag_id)      REFERENCES event_tags(id) ON DELETE SET NULL,
-  FOREIGN KEY (check_in_by) REFERENCES admins(id) ON DELETE SET NULL,
-  FOREIGN KEY (check_out_by)REFERENCES admins(id) ON DELETE SET NULL,
+  FOREIGN KEY (event_id)     REFERENCES events(id),
+  FOREIGN KEY (ticket_id)    REFERENCES tickets(id),
+  FOREIGN KEY (tag_id)       REFERENCES event_tags(id) ON DELETE SET NULL,
+  FOREIGN KEY (check_in_by)  REFERENCES admins(id) ON DELETE SET NULL,
+  FOREIGN KEY (check_out_by) REFERENCES admins(id) ON DELETE SET NULL,
   UNIQUE KEY uq_ticket_attendance (ticket_id)
 ) ENGINE=InnoDB;
 
@@ -308,6 +291,7 @@ CREATE TABLE IF NOT EXISTS event_gallery (
   image_url     VARCHAR(500) NOT NULL,
   thumbnail_url VARCHAR(500) NULL,
   caption       VARCHAR(300) NULL,
+  google_drive_id VARCHAR(200) NULL COMMENT 'Google Drive file ID for reference',
   sort_order    SMALLINT UNSIGNED NOT NULL DEFAULT 0,
   uploaded_by   INT UNSIGNED NULL,
   uploaded_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -360,16 +344,15 @@ CREATE TABLE IF NOT EXISTS expense_requests (
   amount_requested DECIMAL(12,2) NOT NULL,
   amount_approved  DECIMAL(12,2) NULL,
   amount_paid      DECIMAL(12,2) NULL,
-  status           ENUM('pending','approved','rejected','paid')
-                   NOT NULL DEFAULT 'pending',
+  status           ENUM('pending','approved','rejected','paid') NOT NULL DEFAULT 'pending',
   priority         ENUM('low','normal','urgent') NOT NULL DEFAULT 'normal',
   raised_by        INT UNSIGNED NOT NULL,
   approved_by      INT UNSIGNED NULL,
   paid_by          INT UNSIGNED NULL,
-  raise_note       TEXT NULL  COMMENT 'Submitted by department',
-  approve_note     TEXT NULL  COMMENT 'Admin approval/rejection reason',
-  pay_note         TEXT NULL  COMMENT 'Payment reference or note',
-  due_date         DATE NULL  COMMENT 'When department needs the funds by',
+  raise_note       TEXT NULL,
+  approve_note     TEXT NULL,
+  pay_note         TEXT NULL,
+  due_date         DATE NULL,
   created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   approved_at      DATETIME NULL,
   paid_at          DATETIME NULL,
@@ -381,10 +364,46 @@ CREATE TABLE IF NOT EXISTS expense_requests (
 ) ENGINE=InnoDB;
 
 -- =============================================================
--- 17. SUPPORTING TABLES
+-- 17. SOUVENIRS / MERCHANDISE (Pre-order with online payment)
 -- =============================================================
+CREATE TABLE IF NOT EXISTS souvenirs (
+  id                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  event_id          INT UNSIGNED NULL COMMENT 'NULL = available for all events',
+  name              VARCHAR(200) NOT NULL,
+  description       TEXT,
+  price             DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  image_url         VARCHAR(500) NULL,
+  available_qty     INT UNSIGNED NULL COMMENT 'NULL = unlimited',
+  sold_qty          INT UNSIGNED NOT NULL DEFAULT 0,
+  is_active         TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order        TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
 
--- Daily snapshots for event progress dashboard chart
+CREATE TABLE IF NOT EXISTS souvenir_orders (
+  id                 INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  souvenir_id        INT UNSIGNED NOT NULL,
+  participant_id     INT UNSIGNED NULL COMMENT 'NULL = anonymous buyer',
+  buyer_name         VARCHAR(150) NOT NULL,
+  buyer_email        VARCHAR(191) NOT NULL,
+  buyer_phone        VARCHAR(30),
+  quantity           TINYINT UNSIGNED NOT NULL DEFAULT 1,
+  unit_price         DECIMAL(10,2) NOT NULL,
+  total_amount       DECIMAL(10,2) NOT NULL,
+  status             ENUM('pending','paid','cancelled','delivered') NOT NULL DEFAULT 'pending',
+  paystack_reference VARCHAR(100) UNIQUE NULL,
+  delivery_address   TEXT NULL,
+  notes              TEXT NULL,
+  created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  paid_at            DATETIME NULL,
+  FOREIGN KEY (souvenir_id)    REFERENCES souvenirs(id),
+  FOREIGN KEY (participant_id) REFERENCES participants(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- =============================================================
+-- 18. EVENT SNAPSHOTS & FACILITATOR REMINDERS
+-- =============================================================
 CREATE TABLE IF NOT EXISTS event_snapshots (
   id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   event_id      INT UNSIGNED NOT NULL,
@@ -398,7 +417,6 @@ CREATE TABLE IF NOT EXISTS event_snapshots (
   UNIQUE KEY uq_event_snapshot (event_id, snapshot_date)
 ) ENGINE=InnoDB;
 
--- Facilitator reminder log
 CREATE TABLE IF NOT EXISTS facilitator_reminders (
   id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   lecture_id INT UNSIGNED NOT NULL,
@@ -409,32 +427,27 @@ CREATE TABLE IF NOT EXISTS facilitator_reminders (
 ) ENGINE=InnoDB;
 
 -- =============================================================
--- 18. INDEXES
+-- 19. INDEXES
 -- =============================================================
-CREATE INDEX idx_events_status         ON events(status);
-CREATE INDEX idx_events_edition        ON events(edition);
-
-CREATE INDEX idx_tickets_event         ON tickets(event_id);
-CREATE INDEX idx_tickets_participant   ON tickets(participant_id);
-CREATE INDEX idx_tickets_status        ON tickets(status);
-CREATE INDEX idx_tickets_category      ON tickets(category_id);
-
-CREATE INDEX idx_attendance_event      ON attendance(event_id);
-CREATE INDEX idx_attendance_checkin    ON attendance(checked_in_at);
-
-CREATE INDEX idx_event_tags_event      ON event_tags(event_id);
-
-CREATE INDEX idx_gallery_event         ON event_gallery(event_id, sort_order);
-
-CREATE INDEX idx_hostels_active        ON hostels(is_active, gender);
-CREATE INDEX idx_hostel_assignments    ON hostel_assignments(event_id, hostel_id);
-
-CREATE INDEX idx_expenses_status       ON expense_requests(status, created_at DESC);
-CREATE INDEX idx_expenses_dept         ON expense_requests(department_id, status);
-
-CREATE INDEX idx_categories_active     ON event_categories(is_active, sort_order);
-CREATE INDEX idx_speakers_event        ON speakers(event_id);
-CREATE INDEX idx_lectures_event_day    ON lectures(event_id, event_day_id, s_n);
-CREATE INDEX idx_ticket_types_event    ON ticket_types(event_id, is_active, sort_order);
+CREATE INDEX idx_events_status       ON events(status);
+CREATE INDEX idx_events_edition      ON events(edition);
+CREATE INDEX idx_tickets_event       ON tickets(event_id);
+CREATE INDEX idx_tickets_participant ON tickets(participant_id);
+CREATE INDEX idx_tickets_status      ON tickets(status);
+CREATE INDEX idx_tickets_category    ON tickets(category_id);
+CREATE INDEX idx_attendance_event    ON attendance(event_id);
+CREATE INDEX idx_attendance_checkin  ON attendance(checked_in_at);
+CREATE INDEX idx_event_tags_event    ON event_tags(event_id);
+CREATE INDEX idx_gallery_event       ON event_gallery(event_id, sort_order);
+CREATE INDEX idx_hostels_active      ON hostels(is_active, gender);
+CREATE INDEX idx_hostel_assignments  ON hostel_assignments(event_id, hostel_id);
+CREATE INDEX idx_expenses_status     ON expense_requests(status, created_at DESC);
+CREATE INDEX idx_expenses_dept       ON expense_requests(department_id, status);
+CREATE INDEX idx_categories_active   ON event_categories(is_active, sort_order);
+CREATE INDEX idx_speakers_event      ON speakers(event_id);
+CREATE INDEX idx_lectures_event_day  ON lectures(event_id, event_day_id, s_n);
+CREATE INDEX idx_ticket_types_event  ON ticket_types(event_id, is_active, sort_order);
+CREATE INDEX idx_souvenirs_event     ON souvenirs(event_id, is_active);
+CREATE INDEX idx_souvenir_orders     ON souvenir_orders(souvenir_id, status);
 
 SET FOREIGN_KEY_CHECKS = 1;

@@ -203,7 +203,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
-import { Plus, Loader, Bell, Copy } from 'lucide-vue-next';
+import { Plus, Loader, Bell, Copy, Youtube } from 'lucide-vue-next';
 import AppModal from '@/components/common/AppModal.vue';
 import { useAlertStore } from '@/stores/alertStore.js';
 import api from '@/composables/useApi.js';

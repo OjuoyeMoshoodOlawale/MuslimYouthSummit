@@ -41,7 +41,7 @@ export const createEntry = async (req, res, next) => {
       event_day_id, title, lecture_type,
       start_time, end_time,
       main_speaker_name, facilitators,
-      description, speaker_ids = [],
+      description, youtube_url, speaker_ids = [],
     } = req.body;
 
     if (!title?.trim()) return error(res, 'Lecture title is required.', 400);
@@ -55,13 +55,13 @@ export const createEntry = async (req, res, next) => {
       `INSERT INTO lectures
          (event_id, event_day_id, title, lecture_type,
           start_time, end_time, main_speaker_name, facilitators,
-          description, s_n, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          description, youtube_url, s_n, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [eventId, event_day_id || null, title.trim(),
        lecture_type || 'lecture',
        start_time || null, end_time || null,
        main_speaker_name || null, facilitators || null,
-       description || null, maxSn + 1, maxSn + 1]
+       description || null, youtube_url || null, maxSn + 1, maxSn + 1]
     );
 
     const lectureId = r.insertId;
@@ -88,7 +88,7 @@ export const updateEntry = async (req, res, next) => {
       event_day_id, title, lecture_type,
       start_time, end_time,
       main_speaker_name, facilitators,
-      description, s_n, speaker_ids,
+      description, youtube_url, s_n, speaker_ids,
     } = req.body;
 
     await query(
@@ -96,12 +96,12 @@ export const updateEntry = async (req, res, next) => {
          event_day_id=?, title=?, lecture_type=?,
          start_time=?, end_time=?,
          main_speaker_name=?, facilitators=?,
-         description=?, s_n=?, sort_order=?
+         description=?, youtube_url=?, s_n=?, sort_order=?
        WHERE id=?`,
       [event_day_id || null, title, lecture_type || 'lecture',
        start_time || null, end_time || null,
        main_speaker_name || null, facilitators || null,
-       description || null, s_n || 0, s_n || 0, id]
+       description || null, youtube_url || null, s_n || 0, s_n || 0, id]
     );
 
     // Refresh speaker links

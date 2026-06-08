@@ -55,31 +55,36 @@ router.post('/manual', authenticate, authorize('super_admin','admin','department
     if (!tts.length) return err(res, 'Ticket type not found or inactive.', 400);
     const tt = tts[0];
 
-    // Find or create participant
+    // Family registrations: lookup by email + name (not just email)
+    // This allows one parent email to register multiple children with different names
     let participantId;
-    const [existing] = await query('SELECT id FROM participants WHERE email=?', [email.toLowerCase()]);
+    const [existing] = await query(
+      'SELECT id FROM participants WHERE email=? AND name=?',
+      [email.toLowerCase(), name.trim()]
+    );
     if (existing.length) {
       participantId = existing[0].id;
-      await query('UPDATE participants SET name=?, phone=?, updated_at=NOW() WHERE id=?',
-        [name, phone, participantId]);
+      await query('UPDATE participants SET phone=?, updated_at=NOW() WHERE id=?', [phone, participantId]);
     } else {
       const [ins] = await query(
-        'INSERT INTO participants (name, email, phone, gender, occupation) VALUES (?,?,?,?,?)',
-        [name, email.toLowerCase(), phone, gender || null, occupation || null]
+        'INSERT INTO participants (name, email, phone, gender, occupation, email_subscribed) VALUES (?,?,?,?,?,1)',
+        [name.trim(), email.toLowerCase(), phone, gender||null, occupation||null]
       );
       participantId = ins.insertId;
     }
 
-    // Duplicate check
+    // Prevent duplicate ticket for SAME person (name+email) in same event
     const [[{ dup }]] = await query(
       "SELECT COUNT(*) AS dup FROM tickets WHERE participant_id=? AND event_id=? AND status='paid'",
       [participantId, event_id]
     );
-    if (dup > 0) return err(res, 'This participant already has a paid ticket for this event.', 409);
+    if (dup > 0) return err(res, 'This participant already has a ticket for this event. For family members, use the same email with a different name.', 409);
 
     // Generate unique ticket number
     const [[{ cnt }]] = await query('SELECT COUNT(*) AS cnt FROM tickets WHERE event_id=?', [event_id]);
     const uniqueNumber = generateTicketNumber(events[0].edition || 'MYS', cnt + 1);
+    const qrData       = ticketQRData(uniqueNumber);
+    const qrSvg        = await generateQRCodeSVG(qrData).catch(() => null);
     const amountFinal  = parseFloat(amount_paid) || 0;
     const ticketPrice  = parseFloat(tt.regular_price) || 0;
     const balanceDue   = Math.max(0, ticketPrice - amountFinal);

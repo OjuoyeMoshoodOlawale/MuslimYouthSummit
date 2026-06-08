@@ -5,9 +5,21 @@ import { v4 as uuidv4 } from 'uuid';
  * Format: MYS{EDITION}-{ZEROED_SEQUENCE}
  * e.g., MYS3-0001, MYS3-0042
  */
-export const generateTicketNumber = (edition, sequence) => {
-  const padded = String(sequence).padStart(4, '0');
-  return `MYS${edition}-${padded}`;
+/**
+ * Generate a professional unique ticket number.
+ * Format: {PREFIX}-{YY}-{6-digit-seq}
+ * Example: MYS3-25-000001 (MYS3, year 2025, sequence 1)
+ *
+ * @param {string} edition  - Event edition e.g. 'MYS3'
+ * @param {number} sequence - Auto-incremented ticket count for this event
+ * @param {string} [prefix] - Override prefix (optional, uses edition if null)
+ * @returns {string}
+ */
+export const generateTicketNumber = (edition, sequence, prefix = null) => {
+  const base   = (prefix || edition || 'MYS').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const yy     = new Date().getFullYear().toString().slice(-2);
+  const seq    = String(sequence).padStart(6, '0');
+  return `${base}-${yy}-${seq}`;
 };
 
 /**

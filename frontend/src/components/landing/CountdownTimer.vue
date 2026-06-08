@@ -1,8 +1,8 @@
 <template>
-  <div class="grid grid-cols-4 gap-4">
+  <div v-if="valid" class="grid grid-cols-4 gap-3 md:gap-4">
     <div v-for="unit in units" :key="unit.label" class="text-center">
-      <div class="relative bg-black/20 border border-brand-gold/30 px-4 py-4 mb-2">
-        <span class="font-display font-bold text-4xl md:text-5xl text-brand-gold tabular-nums">
+      <div class="bg-black/20 border border-brand-gold/30 px-3 md:px-4 py-3 md:py-4 mb-2">
+        <span class="font-display font-bold text-3xl md:text-5xl text-brand-gold tabular-nums">
           {{ unit.value }}
         </span>
       </div>
@@ -20,10 +20,16 @@ const props = defineProps({
 
 const now = ref(Date.now());
 let timer;
-onMounted(() => { timer = setInterval(() => { now.value = Date.now(); }, 1000); });
+onMounted(()  => { timer = setInterval(() => { now.value = Date.now(); }, 1000); });
 onUnmounted(() => clearInterval(timer));
 
+const valid = computed(() => {
+  const t = new Date(props.targetDate);
+  return !isNaN(t.getTime());
+});
+
 const diff = computed(() => {
+  if (!valid.value) return { days: 0, hours: 0, minutes: 0, seconds: 0 };
   const delta = Math.max(0, new Date(props.targetDate).getTime() - now.value);
   const total = Math.floor(delta / 1000);
   return {
@@ -36,9 +42,9 @@ const diff = computed(() => {
 
 const pad = (n) => String(n).padStart(2, '0');
 const units = computed(() => [
-  { value: String(diff.value.days).padStart(2,'0'),   label: 'Days' },
-  { value: pad(diff.value.hours),   label: 'Hours' },
-  { value: pad(diff.value.minutes), label: 'Minutes' },
-  { value: pad(diff.value.seconds), label: 'Seconds' },
+  { value: String(diff.value.days).padStart(2, '0'), label: 'Days'    },
+  { value: pad(diff.value.hours),                    label: 'Hours'   },
+  { value: pad(diff.value.minutes),                  label: 'Minutes' },
+  { value: pad(diff.value.seconds),                  label: 'Seconds' },
 ]);
 </script>
