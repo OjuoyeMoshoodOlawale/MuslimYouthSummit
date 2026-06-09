@@ -10,10 +10,16 @@
         </button>
         <!-- Desktop nav -->
         <div class="hidden md:flex items-center gap-6 text-white/80 text-sm font-semibold">
-          <button v-for="l in visibleNavLinks" :key="l.id"
-            class="hover:text-brand-gold transition-colors" @click="scrollTo(l.id)">
-            {{ l.label }}
-          </button>
+          <template v-for="l in visibleNavLinks" :key="l.id">
+            <RouterLink v-if="l.type==='route'" :to="l.id"
+              class="hover:text-brand-gold transition-colors flex items-center gap-1.5">
+              <ShoppingBag v-if="l.icon==='ShoppingBag'" :size="13" />
+              {{ l.label }}
+            </RouterLink>
+            <button v-else class="hover:text-brand-gold transition-colors" @click="scrollTo(l.id)">
+              {{ l.label }}
+            </button>
+          </template>
         </div>
         <div class="flex items-center gap-2">
           <button v-if="eventStore.hasActiveEvent"
@@ -33,9 +39,17 @@
       <!-- Mobile dropdown -->
       <Transition name="slide-down-nav">
         <div v-if="mobileMenuOpen" class="md:hidden bg-brand-green/98 border-t border-white/10 py-3 px-6 space-y-1">
-          <button v-for="l in visibleNavLinks" :key="l.id"
-            class="block w-full text-left py-2.5 text-white/80 hover:text-brand-gold transition-colors text-sm font-semibold"
-            @click="scrollTo(l.id); mobileMenuOpen=false">{{ l.label }}</button>
+          <template v-for="l in visibleNavLinks" :key="l.id">
+            <RouterLink v-if="l.type==='route'" :to="l.id"
+              class="flex items-center gap-2 py-2.5 text-white/80 hover:text-brand-gold transition-colors text-sm font-semibold"
+              @click="mobileMenuOpen=false">
+              <ShoppingBag v-if="l.icon==='ShoppingBag'" :size="14" />
+              {{ l.label }}
+            </RouterLink>
+            <button v-else
+              class="block w-full text-left py-2.5 text-white/80 hover:text-brand-gold transition-colors text-sm font-semibold"
+              @click="scrollTo(l.id); mobileMenuOpen=false">{{ l.label }}</button>
+          </template>
           <button v-if="eventStore.hasActiveEvent"
             class="mt-2 w-full btn-gold text-xs py-3 justify-center"
             @click="scrollTo('tickets'); mobileMenuOpen=false">
@@ -556,11 +570,12 @@ const heroStep       = ref(0);
 const activeDay      = ref(null);
 
 const allNavLinks = [
-  { id:'about',       label:'About',        alwaysShow: true  },
-  { id:'schedule',    label:'Programme',    alwaysShow: false },
-  { id:'speakers',    label:'Speakers',     alwaysShow: false },
-  { id:'tickets',     label:'Tickets',      alwaysShow: false },
-  { id:'past-events', label:'Past Editions',alwaysShow: true  },
+  { id:'about',       label:'About',        alwaysShow: true,  type:'scroll' },
+  { id:'schedule',    label:'Programme',    alwaysShow: false, type:'scroll' },
+  { id:'speakers',    label:'Speakers',     alwaysShow: false, type:'scroll' },
+  { id:'tickets',     label:'Tickets',      alwaysShow: false, type:'scroll' },
+  { id:'past-events', label:'Past Editions',alwaysShow: true,  type:'scroll' },
+  { id:'/shop',       label:'Shop',         alwaysShow: true,  type:'route', icon:'ShoppingBag' },
 ];
 
 const visibleNavLinks = computed(() =>
