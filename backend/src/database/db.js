@@ -12,6 +12,7 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  dateStrings: true,          // Return DATE/DATETIME as strings, not JS Date objects
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
 });

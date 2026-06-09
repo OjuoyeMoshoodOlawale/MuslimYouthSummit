@@ -402,6 +402,23 @@ async function seed() {
     log(`✅ ${name} — ₦${price.toLocaleString()}`);
   }
 
+  /* 16-extra. SPONSORS */
+  console.log('\n⭐ Sponsors...');
+  for (const [event_id_, name, logo_url, website_url, tier, sort_order] of [
+    [mys3Id, 'Dangote Foundation',    'https://picsum.photos/seed/sp1/200/80', 'https://dangote.com',     'title',   0],
+    [mys3Id, 'MTN Nigeria',           'https://picsum.photos/seed/sp2/200/80', 'https://mtnonline.com',   'gold',    1],
+    [mys3Id, 'First Bank Nigeria',    'https://picsum.photos/seed/sp3/200/80', 'https://firstbank.ng',   'gold',    2],
+    [mys3Id, 'The Nation Newspaper',  'https://picsum.photos/seed/sp4/200/80', 'https://thenation.ng',   'media',   3],
+    [null,   'Jaiz Bank',             'https://picsum.photos/seed/sp5/200/80', 'https://jaizbankplc.com','silver',  4],
+    [null,   'Islam Channel',         'https://picsum.photos/seed/sp6/200/80', 'https://islamchannel.tv','partner', 5],
+  ]) {
+    await q(
+      'INSERT INTO sponsors (event_id,name,logo_url,website_url,tier,sort_order) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE tier=VALUES(tier)',
+      [event_id_, name, logo_url, website_url, tier, sort_order]
+    );
+    log(`✅ [${tier}] ${name}`);
+  }
+
   const D='═'.repeat(62);
   console.log('\n'+D+'\n🎉  MYS Demo Seed v4 — Complete!\n');
   console.log('  LOGINS:');

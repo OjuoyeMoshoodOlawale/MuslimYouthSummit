@@ -406,6 +406,44 @@
       </div>
     </section>
 
+    <!-- ── SPONSORS ────────────────────────────────────────── -->
+    <section v-if="sponsors.length" class="py-12 md:py-16 bg-white border-t border-gray-100">
+      <div class="max-w-7xl mx-auto px-4 md:px-6">
+        <div class="text-center mb-8 reveal">
+          <p class="text-brand-gold font-bold text-xs uppercase tracking-[0.3em] mb-2 flex items-center justify-center gap-2">
+            <Handshake :size="13" /> Sponsors & Partners
+          </p>
+          <h2 class="font-display font-bold text-2xl md:text-3xl text-brand-green">Our Supporters</h2>
+        </div>
+        <!-- Title sponsors first, large -->
+        <div v-if="sponsors.filter(s=>s.tier==='title').length" class="flex justify-center mb-8">
+          <div v-for="sp in sponsors.filter(s=>s.tier==='title')" :key="sp.id"
+            class="flex flex-col items-center gap-3 px-8">
+            <a :href="sp.website_url || '#'" :target="sp.website_url ? '_blank' : '_self'"
+              class="h-20 flex items-center justify-center">
+              <img v-if="sp.logo_url" :src="sp.logo_url" :alt="sp.name" class="max-h-20 max-w-[200px] object-contain" />
+              <span v-else class="font-display font-bold text-2xl text-brand-green">{{ sp.name }}</span>
+            </a>
+            <span class="badge text-xs" style="background:#FEC70020;color:#FEC700;border:1px solid #FEC70050">Title Sponsor</span>
+          </div>
+        </div>
+        <!-- Other tiers - smaller logos in a row -->
+        <div v-if="sponsors.filter(s=>s.tier!=='title').length"
+          class="flex flex-wrap justify-center items-center gap-6 md:gap-10">
+          <a v-for="sp in sponsors.filter(s=>s.tier!=='title')" :key="sp.id"
+            :href="sp.website_url || '#'" :target="sp.website_url ? '_blank' : '_self'"
+            class="flex flex-col items-center gap-2 group opacity-70 hover:opacity-100 transition-opacity"
+            :title="sp.name">
+            <div class="h-12 flex items-center justify-center">
+              <img v-if="sp.logo_url" :src="sp.logo_url" :alt="sp.name" class="max-h-12 max-w-[140px] object-contain grayscale group-hover:grayscale-0 transition-all" />
+              <span v-else class="font-semibold text-sm text-gray-600">{{ sp.name }}</span>
+            </div>
+            <span class="text-xs text-gray-400 capitalize">{{ sp.tier }}</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
     <!-- ── FOOTER ────────────────────────────────────────── -->
     <footer class="bg-brand-green text-white py-12 md:py-14">
       <div class="max-w-7xl mx-auto px-4 md:px-6">
@@ -457,7 +495,7 @@ import { useRouter } from 'vue-router';
 import {
   Ticket, CalendarDays, MapPin, ChevronDown, Sparkles, Target, Mic, LayoutList,
   ShieldCheck, Images, History, ArrowRight, Lock, Heart, Menu, X, BookOpen,
-  Briefcase, Users, GraduationCap, Youtube, ShoppingBag,
+  Briefcase, Users, GraduationCap, Youtube, ShoppingBag, Handshake,
 } from 'lucide-vue-next';
 import { useEventStore }   from '@/stores/eventStore.js';
 import { useScrollReveal } from '@/composables/useScrollReveal.js';
@@ -474,6 +512,7 @@ const { setupReveal } = useScrollReveal();
 const scrolled       = ref(false);
 const mobileMenuOpen = ref(false);
 const gallery        = ref([]);
+const sponsors       = ref([]);
 const sponsors       = ref([]);
 const lectures       = ref([]);
 const eventDays      = ref([]);

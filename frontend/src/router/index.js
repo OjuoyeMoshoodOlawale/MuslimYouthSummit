@@ -32,6 +32,7 @@ const AdminExpenses       = () => import('@/views/admin/AdminExpenses.vue');
 const AdminSettings       = () => import('@/views/admin/AdminSettings.vue');
 const AdminSouvenirs      = () => import('@/views/admin/AdminSouvenirs.vue');
 const AdminSponsors       = () => import('@/views/admin/AdminSponsors.vue');
+const AdminSponsors       = () => import('@/views/admin/AdminSponsors.vue');
 const Souvenirs           = () => import('@/views/Souvenirs.vue');
 
 /* ─── Roles shorthand ────────────────────────────────────── */
@@ -119,6 +120,8 @@ const routes = [
       { path: 'settings',            name: 'admin-settings',        component: AdminSettings,
         meta: { roles: ALL_ADMIN } },
       { path: 'souvenirs',           name: 'admin-souvenirs',       component: AdminSouvenirs,
+        meta: { roles: ADMIN_ONLY } },
+      { path: 'sponsors',            name: 'admin-sponsors',        component: AdminSponsors,
         meta: { roles: ADMIN_ONLY } },
       { path: 'sponsors',            name: 'admin-sponsors',        component: AdminSponsors,
         meta: { roles: ADMIN_ONLY } },

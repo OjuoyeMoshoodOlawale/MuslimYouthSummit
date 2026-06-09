@@ -69,7 +69,7 @@
             class="border border-gray-100 p-4 space-y-3 relative">
             <button v-if="form.ticket_types.length > 1" type="button"
               class="absolute top-3 right-3 text-gray-300 hover:text-red-400 text-sm"
-              @click="form.ticket_types.splice(i,1)">✕</button>
+              @click="form.ticket_types.splice(i,1)">&times;</button>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div class="col-span-2 md:col-span-1">
                 <label class="label text-xs">Type Name *</label>

@@ -4,9 +4,9 @@ import { query } from '../database/db.js';
 import { success, created, error, notFound } from '../utils/response.js';
 
 const router = express.Router();
-const adm = [authenticate, authorize('super_admin', 'admin')];
+const adm    = [authenticate, authorize('super_admin', 'admin')];
 
-/* ── Public: get sponsors for an event (or all global) ──────── */
+/* ── Public: list active sponsors ────────────────────────────── */
 router.get('/sponsors', async (req, res, next) => {
   try {
     const { event_id } = req.query;
@@ -27,7 +27,7 @@ router.get('/sponsors', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-/* ── Admin: list all ────────────────────────────────────────── */
+/* ── Admin: list all ──────────────────────────────────────────── */
 router.get('/sponsors/all', ...adm, async (req, res, next) => {
   try {
     const [rows] = await query(
@@ -39,7 +39,7 @@ router.get('/sponsors/all', ...adm, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-/* ── Admin: create ──────────────────────────────────────────── */
+/* ── Admin: create ────────────────────────────────────────────── */
 router.post('/sponsors', ...adm, async (req, res, next) => {
   try {
     const { event_id, name, logo_url, website_url, tier, description, sort_order } = req.body;
@@ -54,13 +54,13 @@ router.post('/sponsors', ...adm, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-/* ── Admin: update ──────────────────────────────────────────── */
+/* ── Admin: update ────────────────────────────────────────────── */
 router.put('/sponsors/:id', ...adm, async (req, res, next) => {
   try {
     const { event_id, name, logo_url, website_url, tier, description, sort_order, is_active } = req.body;
     await query(
-      `UPDATE sponsors SET event_id=?, name=?, logo_url=?, website_url=?, tier=?,
-         description=?, sort_order=?, is_active=? WHERE id=?`,
+      `UPDATE sponsors SET event_id=?, name=?, logo_url=?, website_url=?,
+         tier=?, description=?, sort_order=?, is_active=? WHERE id=?`,
       [event_id || null, name, logo_url || null, website_url || null,
        tier || 'gold', description || null, sort_order ?? 0, is_active ? 1 : 0, req.params.id]
     );
@@ -68,7 +68,7 @@ router.put('/sponsors/:id', ...adm, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-/* ── Admin: delete ──────────────────────────────────────────── */
+/* ── Admin: delete ────────────────────────────────────────────── */
 router.delete('/sponsors/:id', ...adm, async (req, res, next) => {
   try {
     await query('DELETE FROM sponsors WHERE id=?', [req.params.id]);
