@@ -236,36 +236,45 @@ const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-NG',{day:'numer
 
 // Validation handled by useForm
 
-/** Paystack inline popup flow */
-const openPaystackPopup = (authData) => {
-  return new Promise((resolve, reject) => {
-    // Load Paystack inline script if not already loaded
-    const loadScript = () => new Promise((res) => {
-      if (window.PaystackPop) { res(); return; }
-      const script = document.createElement('script');
-      script.src = 'https://js.paystack.co/v1/inline.js';
-      script.onload = res;
-      document.head.appendChild(script);
-    });
+/** Load Paystack inline script once */
+const loadPaystackScript = () => new Promise((resolve) => {
+  if (window.PaystackPop) { resolve(true); return; }
+  const s = document.createElement('script');
+  s.src = 'https://js.paystack.co/v1/inline.js';
+  s.onload = () => resolve(true);
+  s.onerror = () => resolve(false);
+  document.head.appendChild(s);
+  setTimeout(() => resolve(false), 5000); // 5s timeout
+});
 
-    loadScript().then(() => {
-      const handler = window.PaystackPop.setup({
-        key:       authData.public_key || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
-        email:     form.email,
-        amount:    Math.round(Number(selectedPrice.value) * 100), // kobo
-        ref:       authData.reference,
-        currency:  'NGN',
-        metadata: {
-          custom_fields: [
-            { display_name: 'Full Name',     variable_name: 'name',   value: form.name },
-            { display_name: 'Ticket Number', variable_name: 'ticket', value: authData.ticket_number },
-          ],
-        },
-        onClose: () => reject(new Error('Payment window closed.')),
-        callback: (response) => resolve(response),
-      });
-      handler.openIframe();
+/** Open Paystack inline popup */
+const openPaystackPopup = (authData) => {
+  return new Promise(async (resolve, reject) => {
+    const publicKey = authData.public_key || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
+    if (!publicKey) { reject(new Error('NO_KEY')); return; }
+
+    const loaded = await loadPaystackScript();
+    if (!loaded || !window.PaystackPop) { reject(new Error('SCRIPT_FAILED')); return; }
+
+    const handler = window.PaystackPop.setup({
+      key:      publicKey,
+      email:    form.email,
+      amount:   Math.round(Number(selectedPrice.value) * 100), // kobo
+      ref:      authData.reference,
+      currency: 'NGN',
+      metadata: {
+        custom_fields: [
+          { display_name: 'Full Name',     variable_name: 'name',   value: form.name },
+          { display_name: 'Ticket Number', variable_name: 'ticket', value: authData.ticket_number },
+        ],
+      },
+      onClose: () => reject(new Error('CLOSED')),
+      callback: (response) => {
+        // Payment confirmed by Paystack — now verify on our backend
+        resolve(response);
+      },
     });
+    handler.openIframe();
   });
 };
 
@@ -284,21 +293,23 @@ const pay = async () => {
 
     const authData = data.data;
 
-    // 2. Try Paystack popup first, fall back to redirect
-    if (window.PaystackPop || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY) {
+    // 2. Try Paystack popup first, fall back to full-page redirect
+    try {
+      await openPaystackPopup(authData);
+      // Popup payment succeeded — verify with backend then show ticket
+      processing.value = true;
       try {
-        await openPaystackPopup(authData);
-        // Payment succeeded — verify and show ticket
-        router.push(`/ticket/verify?reference=${authData.reference}`);
+        await api.get(`/tickets/verify/${authData.reference}`);
+      } catch {} // Verification errors are handled on the ticket page
+      router.push(`/ticket/verify?reference=${authData.reference}`);
+      return;
+    } catch (popupErr) {
+      if (popupErr.message === 'CLOSED') {
+        serverError.value = 'Payment window closed. Your ticket is reserved for 30 minutes. Click Pay to try again.';
+        processing.value = false;
         return;
-      } catch (popupErr) {
-        if (popupErr.message === 'Payment window closed.') {
-          serverError.value = 'Payment cancelled. You can try again.';
-          processing.value = false;
-          return;
-        }
-        // Popup failed — fall through to redirect
       }
+      // NO_KEY or SCRIPT_FAILED — fall through to full-page redirect
     }
 
     // 3. Full-page redirect to Paystack (fallback)

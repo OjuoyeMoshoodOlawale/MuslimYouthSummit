@@ -37,13 +37,18 @@ const ps = () => axios.create({
  */
 export const initializeTransaction = async ({ email, amount, reference, metadata, callback_url }) => {
   assertKey();
+  // Always provide a callback URL so Paystack can redirect back after payment
+  const finalCallbackUrl = callback_url
+    || process.env.PAYMENT_CALLBACK_URL
+    || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/ticket/verify`;
+
   try {
     const { data } = await ps().post('/transaction/initialize', {
       email,
       amount,   // in kobo
       reference,
       metadata,
-      callback_url: callback_url || process.env.PAYMENT_CALLBACK_URL,
+      callback_url: finalCallbackUrl,
     });
     if (!data.status) throw new Error(data.message || 'Paystack initialization failed.');
     return data.data; // { authorization_url, access_code, reference }
