@@ -1,9 +1,9 @@
 <template>
   <div class="space-y-5">
     <div class="grid grid-cols-3 gap-4">
-      <StatsWidget label="Checked In"  :value="live.checked_in  ?? '—'" icon="✅" />
-      <StatsWidget label="Checked Out" :value="live.checked_out ?? '—'" icon="🚪" />
-      <StatsWidget label="On Premises" :value="live.on_premises  ?? '—'" icon="🏛" iconBg="bg-green-50" />
+      <StatsWidget label="Checked In"  :value="live.checked_in  ?? '—'" :icon="ShieldCheck" iconBg="bg-green-50"  iconColor="text-green-600" />
+      <StatsWidget label="Checked Out" :value="live.checked_out ?? '—'" :icon="LogOut"      iconBg="bg-blue-50"   iconColor="text-blue-600" />
+      <StatsWidget label="On Premises" :value="live.on_premises  ?? '—'" :icon="Users"       iconBg="bg-brand-cream" />
     </div>
 
     <div class="flex items-center justify-between flex-wrap gap-3">
@@ -45,6 +45,7 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue';
+import { ShieldCheck, LogOut, Users } from 'lucide-vue-next';
 import StatsWidget from '@/components/admin/StatsWidget.vue';
 import DataTable   from '@/components/admin/DataTable.vue';
 import { useEventStore } from '@/stores/eventStore.js';

@@ -56,7 +56,7 @@
               'bg-gray-400 text-white':    found.check_out_at,
               'bg-brand-gold text-brand-green': !found.check_in_at,
             }">
-            {{ found.check_out_at ? '🚪 Checked Out' : found.check_in_at ? '✅ Already In' : '🎟 Valid Ticket' }}
+            {{ found.check_out_at ? 'Checked Out' : found.check_in_at ? 'Already Checked In' : 'Valid Ticket' }}
           </div>
 
           <div class="p-5 space-y-4">
@@ -143,7 +143,7 @@
               <button class="w-full py-4 bg-brand-gold text-brand-green font-display font-bold uppercase tracking-wider rounded-sm"
                 :class="{ 'opacity-70 cursor-wait': checkingIn }"
                 :disabled="checkingIn" @click="doCheckIn">
-                {{ checkingIn ? 'Checking in…' : '✅ Check In' }}
+                {{ checkingIn ? 'Checking in…' : 'Check In' }}
               </button>
             </div>
 

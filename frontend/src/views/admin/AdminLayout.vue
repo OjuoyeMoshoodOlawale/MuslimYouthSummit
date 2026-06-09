@@ -132,6 +132,7 @@ const pageTitles = {
   'admin-departments':     'Departments',
   'admin-expenses':        'Expense Requests',
   'admin-souvenirs':       'Souvenirs & Merchandise',
+  'admin-sponsors':        'Sponsors & Partners',
   'admin-admins':          'Admin Users',
   'admin-settings':        'My Settings',
 };

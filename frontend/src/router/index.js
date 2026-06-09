@@ -123,8 +123,6 @@ const routes = [
         meta: { roles: ADMIN_ONLY } },
       { path: 'sponsors',            name: 'admin-sponsors',        component: AdminSponsors,
         meta: { roles: ADMIN_ONLY } },
-      { path: 'sponsors',            name: 'admin-sponsors',        component: AdminSponsors,
-        meta: { roles: ADMIN_ONLY } },
     ],
   },
 

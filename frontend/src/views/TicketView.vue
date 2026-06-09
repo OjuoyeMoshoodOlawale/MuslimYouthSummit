@@ -14,7 +14,7 @@
 
       <!-- Error -->
       <div v-else-if="error" class="text-center py-20">
-        <p class="text-4xl mb-4">❌</p>
+        <XCircle :size="48" class="mx-auto mb-4 text-red-400" />
         <h2 class="font-display font-bold text-2xl text-brand-green mb-2">Ticket Not Found</h2>
         <p class="text-gray-500 mb-6">{{ error }}</p>
         <RouterLink to="/" class="btn-green">← Back to Home</RouterLink>
@@ -25,7 +25,7 @@
         <!-- Status banner -->
         <div class="text-center py-4" :class="ticket.status === 'paid' ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'">
           <p class="font-bold text-sm" :class="ticket.status === 'paid' ? 'text-green-700' : 'text-yellow-700'">
-            {{ ticket.status === 'paid' ? '✅ Payment Confirmed' : '⏳ Payment Pending' }}
+            {{ ticket.status === 'paid' ? 'Payment Confirmed' : 'Payment Pending' }}
           </p>
         </div>
 

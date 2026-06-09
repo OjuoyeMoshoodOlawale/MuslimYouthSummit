@@ -33,14 +33,48 @@
   <!-- Upload modal -->
   <AppModal v-model="uploadModal" title="Upload Photos" size="lg">
     <div class="space-y-4">
-      <div class="border-2 border-dashed border-gray-200 rounded p-8 text-center"
+      <!-- Upload tabs -->
+      <div class="flex gap-4 border-b border-gray-200 mb-2">
+        <button v-for="t in ['file','url','drive']" :key="t"
+          class="pb-2.5 text-sm font-semibold border-b-2 transition-colors capitalize"
+          :class="uploadTab===t ? 'border-brand-green text-brand-green' : 'border-transparent text-gray-400'"
+          @click="uploadTab=t">
+          {{ {file:'Upload Files', url:'Image URL', drive:'Google Drive URL'}[t] }}
+        </button>
+      </div>
+
+      <!-- File upload -->
+      <div v-if="uploadTab==='file'" class="border-2 border-dashed border-gray-200 p-8 text-center"
         @dragover.prevent @drop.prevent="handleDrop">
         <input type="file" id="img-input" multiple accept="image/*" class="hidden" @change="handleFiles" />
         <label for="img-input" class="cursor-pointer">
-          <p class="text-4xl mb-2">📷</p>
+          <Image :size="40" class="mx-auto mb-2 text-gray-300" />
           <p class="text-sm text-gray-500">Click to select or drag & drop images</p>
           <p class="text-xs text-gray-400 mt-1">JPG, PNG, WEBP · Max 5MB each</p>
         </label>
+      </div>
+
+      <!-- Image URL -->
+      <div v-if="uploadTab==='url'" class="space-y-3">
+        <p class="text-xs text-gray-500">Paste a publicly accessible image URL (e.g. from a CDN, hosting service, or Imgur)</p>
+        <input v-model="urlInput" class="input text-sm" placeholder="https://example.com/image.jpg" />
+        <input v-model="urlCaption" class="input text-sm" placeholder="Caption (optional)" />
+        <div v-if="urlInput" class="h-32 border border-gray-100 overflow-hidden">
+          <img :src="urlInput" class="w-full h-full object-cover" @error="urlError=true" />
+        </div>
+      </div>
+
+      <!-- Google Drive URL -->
+      <div v-if="uploadTab==='drive'" class="space-y-3">
+        <div class="bg-blue-50 border border-blue-100 p-3 text-xs text-blue-700 leading-relaxed">
+          <strong>Google Drive:</strong> Share your image → Copy link → Change permissions to "Anyone with link can view" →
+          Paste the link below. We store the Drive link directly (no file upload needed).
+        </div>
+        <input v-model="driveInput" class="input text-sm" placeholder="https://drive.google.com/file/d/XXXX/view?usp=sharing" />
+        <input v-model="driveCaption" class="input text-sm" placeholder="Caption (optional)" />
+        <p v-if="driveInput" class="text-xs text-gray-500 break-all">
+          Stored as: <code class="bg-gray-100 px-1">{{ driveInput }}</code>
+        </p>
       </div>
 
       <div v-if="filePreviews.length" class="grid grid-cols-3 gap-3">
@@ -53,9 +87,17 @@
       </div>
 
       <div class="flex gap-2">
-        <button :disabled="!filePreviews.length || uploading" class="btn-green text-xs"
-          @click="doUpload">
+        <button v-if="uploadTab==='file'" :disabled="!filePreviews.length || uploading"
+          class="btn-green text-xs" @click="doUpload">
           {{ uploading ? 'Uploading…' : `Upload ${filePreviews.length} photo(s)` }}
+        </button>
+        <button v-if="uploadTab==='url'" :disabled="!urlInput || uploading"
+          class="btn-green text-xs" @click="doUploadUrl">
+          {{ uploading ? 'Adding…' : 'Add Image' }}
+        </button>
+        <button v-if="uploadTab==='drive'" :disabled="!driveInput || uploading"
+          class="btn-green text-xs" @click="doUploadDrive">
+          {{ uploading ? 'Saving…' : 'Save Drive Link' }}
         </button>
         <button class="btn-ghost text-xs" @click="uploadModal = false">Cancel</button>
       </div>
@@ -73,6 +115,12 @@ const alert        = useAlertStore();
 const events       = ref([]);
 const images       = ref([]);
 const selectedEvent = ref('');
+const uploadTab    = ref('file');
+const urlInput     = ref('');
+const urlCaption   = ref('');
+const driveInput   = ref('');
+const driveCaption = ref('');
+const urlError     = ref(false);
 const loading      = ref(false);
 const uploadModal  = ref(false);
 const uploading    = ref(false);
@@ -103,6 +151,41 @@ const handleDrop = (e) => {
   const dt = e.dataTransfer;
   const event = { target: { files: dt.files } };
   handleFiles(event);
+};
+
+const doUploadUrl = async () => {
+  if (!urlInput.value || !selectedEvent.value) return;
+  uploading.value = true;
+  try {
+    await api.post(`/gallery/${selectedEvent.value}`, {
+      image_url: urlInput.value,
+      caption: urlCaption.value || null,
+    });
+    alert.success('Image added.'); uploadModal.value=false;
+    urlInput.value=''; urlCaption.value=''; load();
+  } catch (e) { alert.error(e.response?.data?.message || 'Failed.'); }
+  finally { uploading.value = false; }
+};
+
+const doUploadDrive = async () => {
+  if (!driveInput.value || !selectedEvent.value) return;
+  uploading.value = true;
+  try {
+    // Convert Google Drive share link to direct view URL if possible
+    let imageUrl = driveInput.value;
+    const match = driveInput.value.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (match) {
+      imageUrl = `https://drive.google.com/uc?export=view&id=${match[1]}`;
+    }
+    await api.post(`/gallery/${selectedEvent.value}`, {
+      image_url: imageUrl,
+      google_drive_id: match?.[1] || null,
+      caption: driveCaption.value || null,
+    });
+    alert.success('Drive image linked.'); uploadModal.value=false;
+    driveInput.value=''; driveCaption.value=''; load();
+  } catch (e) { alert.error(e.response?.data?.message || 'Failed.'); }
+  finally { uploading.value = false; }
 };
 
 const doUpload = async () => {

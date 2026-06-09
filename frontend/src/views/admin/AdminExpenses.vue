@@ -170,7 +170,7 @@
           <select v-model="form.priority" class="input">
             <option value="low">Low</option>
             <option value="normal">Normal</option>
-            <option value="urgent">🔴 Urgent</option>
+            <option value="urgent">Urgent (High Priority)</option>
           </select>
         </div>
         <div>
@@ -199,7 +199,7 @@
   </AppModal>
 
   <!-- Review modal (approve/reject) -->
-  <AppModal v-model="reviewModal" :title="reviewAction==='approve' ? '✅ Approve Request' : '❌ Reject Request'" size="md">
+  <AppModal v-model="reviewModal" :title="reviewAction==='approve' ? 'Approve Request' : 'Reject Request'" size="md">
     <div class="space-y-4">
       <div class="bg-gray-50 p-4 rounded">
         <p class="font-semibold">{{ reviewing?.title }}</p>

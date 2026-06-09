@@ -97,7 +97,6 @@ const allSections = [
       { to:'/admin/gallery',    label:'Gallery',     icon:Image,       roles:['super_admin','admin'] },
       { to:'/admin/souvenirs',  label:'Souvenirs',   icon:ShoppingBag, roles:['super_admin','admin'] },
       { to:'/admin/sponsors',   label:'Sponsors',    icon:Handshake,   roles:['super_admin','admin'] },
-      { to:'/admin/sponsors',   label:'Sponsors',    icon:Star,        roles:['super_admin','admin'] },
     ],
   },
   {

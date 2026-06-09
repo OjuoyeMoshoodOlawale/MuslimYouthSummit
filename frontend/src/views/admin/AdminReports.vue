@@ -10,7 +10,7 @@
           <option value="">Select event…</option>
           <option v-for="e in events" :key="e.id" :value="e.id">{{ e.edition ? `[${e.edition}] ${e.title}` : e.title }}</option>
         </select>
-        <button v-if="selectedEvent" class="btn-outline text-xs" @click="printReport">🖨 Print</button>
+        <button v-if="selectedEvent" class="btn-outline text-xs" @click="printReport">Print</button>
       </div>
     </div>
 

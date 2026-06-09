@@ -109,7 +109,7 @@
         </table>
 
         <div v-else class="py-16 text-center text-gray-400">
-          <p class="text-3xl mb-2">📋</p>
+          
           <p class="text-sm">No schedule entries yet. Click "Add Entry" to start.</p>
         </div>
       </div>
