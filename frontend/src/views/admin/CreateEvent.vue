@@ -116,7 +116,7 @@ const alert  = useAlertStore();
 const saving  = ref(false);
 
 const form = reactive({
-  title: '', edition: '', tagline: '', description: '',
+  title: '', edition: '', ticket_prefix: '', tagline: '', description: '',
   venue: '', start_date: '', end_date: '', early_bird_closes_at: '',
   ticket_types: [{ name: 'Regular', regular_price: 0, early_bird_price: '', quantity_available: '' }],
 });

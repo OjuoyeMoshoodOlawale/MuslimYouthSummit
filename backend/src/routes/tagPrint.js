@@ -1,0 +1,461 @@
+import express from 'express';
+import { authenticate } from '../middleware/auth.js';
+import { query } from '../database/db.js';
+
+const router = express.Router();
+
+const TIER_COLORS = {
+  title:   { bg: '#FFD700', text: '#02462E', border: '#FEC700' },
+  gold:    { bg: '#FEC700', text: '#02462E', border: '#d4a800' },
+  silver:  { bg: '#C0C0C0', text: '#333333', border: '#999999' },
+  bronze:  { bg: '#CD7F32', text: '#ffffff', border: '#a0621f' },
+  media:   { bg: '#02462E', text: '#ffffff', border: '#013a24' },
+  partner: { bg: '#e8f4fd', text: '#1a4fa0', border: '#1a4fa0' },
+};
+
+/* ──────────────────────────────────────────────────────────────
+   GET /api/events/:eventId/tags/print?ids=1,2,3,4
+   Returns print-ready HTML: 4 badges per A4 page, cut lines
+   ────────────────────────────────────────────────────────────── */
+router.get('/events/:eventId/tags/print', authenticate, async (req, res, next) => {
+  try {
+    const { eventId } = req.params;
+    const { ids, unassigned, limit = 40 } = req.query;
+
+    // Get event info
+    const [[event]] = await query('SELECT * FROM events WHERE id=?', [eventId]);
+    if (!event) return res.status(404).send('<h1>Event not found</h1>');
+
+    // Get tags
+    let tagQuery, tagParams;
+    if (ids) {
+      const idList = ids.split(',').map(Number).filter(Boolean);
+      tagQuery = `
+        SELECT et.*, p.name AS participant_name, p.gender,
+               c.name AS category_name, c.color AS category_color,
+               t.unique_number AS ticket_number
+        FROM event_tags et
+        LEFT JOIN participants p  ON p.id  = et.participant_id
+        LEFT JOIN tickets t       ON t.id  = et.ticket_id
+        LEFT JOIN tickets tk      ON tk.id = et.ticket_id
+        LEFT JOIN event_categories c ON c.id = tk.category_id
+        WHERE et.event_id=? AND et.id IN (${idList.map(()=>'?').join(',')})
+        ORDER BY et.tag_number`;
+      tagParams = [eventId, ...idList];
+    } else if (unassigned === '1') {
+      tagQuery = `
+        SELECT et.*, NULL AS participant_name, NULL AS gender,
+               NULL AS category_name, NULL AS category_color, NULL AS ticket_number
+        FROM event_tags et WHERE et.event_id=? AND et.ticket_id IS NULL
+        ORDER BY et.tag_number LIMIT ?`;
+      tagParams = [eventId, parseInt(limit)];
+    } else {
+      tagQuery = `
+        SELECT et.*, p.name AS participant_name, p.gender,
+               c.name AS category_name, c.color AS category_color,
+               t.unique_number AS ticket_number
+        FROM event_tags et
+        LEFT JOIN participants p  ON p.id  = et.participant_id
+        LEFT JOIN tickets t       ON t.id  = et.ticket_id
+        LEFT JOIN event_categories c ON c.id = t.category_id
+        WHERE et.event_id=?
+        ORDER BY et.tag_number LIMIT ?`;
+      tagParams = [eventId, parseInt(limit)];
+    }
+
+    const [tags] = await query(tagQuery, tagParams);
+    if (!tags.length) return res.status(404).send('<h1>No tags found for the given criteria.</h1>');
+
+    // Mark as printed
+    const tagIds = tags.map(t => t.id);
+    await query(`UPDATE event_tags SET is_printed=1 WHERE id IN (${tagIds.map(()=>'?').join(',')})`, tagIds);
+
+    // Build badge HTML for each tag
+    const buildBadge = (tag, event) => {
+      const catColor  = tag.category_color  || '#02462E';
+      const catName   = tag.category_name   || 'General';
+      const pName     = tag.participant_name || '—';
+      const tagNum    = tag.tag_number       || '???';
+      const ticketNum = tag.ticket_number    || '';
+
+      return `
+      <div class="badge">
+        <!-- Top bar with event branding -->
+        <div class="badge-header" style="background:${catColor}">
+          <span class="badge-event-name">${event.edition || 'MYS'}</span>
+          <span class="badge-event-title">${event.title}</span>
+        </div>
+
+        <!-- Main content -->
+        <div class="badge-body">
+          <div class="badge-left">
+            <!-- Participant name -->
+            <div class="badge-name">${pName}</div>
+
+            <!-- Category pill -->
+            <div class="badge-category" style="background:${catColor}22;color:${catColor};border:1.5px solid ${catColor}">
+              ${catName}
+            </div>
+
+            <!-- Tag number (large, unique) -->
+            <div class="badge-tag-num">${tagNum}</div>
+
+            <!-- Ticket ref -->
+            ${ticketNum ? `<div class="badge-ticket-ref">${ticketNum}</div>` : ''}
+          </div>
+
+          <!-- QR Code -->
+          <div class="badge-qr">
+            ${tag.qr_code_svg
+              ? tag.qr_code_svg.replace('<svg', '<svg width="100" height="100"')
+              : buildFallbackQR(tagNum)
+            }
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="badge-footer" style="background:${catColor}11;border-top:2px solid ${catColor}33">
+          <span>Scan to verify • ${event.venue || 'Muslim Youth Summit'}</span>
+        </div>
+      </div>`;
+    };
+
+    const buildFallbackQR = (text) => `
+      <div style="width:100px;height:100px;border:2px dashed #ccc;display:flex;align-items:center;justify-content:center;font-size:9px;text-align:center;color:#888;padding:4px">
+        ${text}
+      </div>`;
+
+    // Group into pages of 4
+    const pages = [];
+    for (let i = 0; i < tags.length; i += 4) {
+      pages.push(tags.slice(i, i + 4));
+    }
+
+    const pagesHtml = pages.map((pageTags, pi) => {
+      const badges = pageTags.map(t => buildBadge(t, event));
+      // Pad to 4 if last page has fewer
+      while (badges.length < 4) {
+        badges.push(`<div class="badge badge-empty"><div class="empty-label">Blank</div></div>`);
+      }
+      return `
+      <div class="page">
+        <div class="grid">
+          <div class="cell">
+            ${badges[0]}
+            <div class="cut-h"></div>
+          </div>
+          <div class="cell">
+            ${badges[1]}
+            <div class="cut-h"></div>
+          </div>
+          <div class="cell border-bottom-cut">
+            ${badges[2]}
+          </div>
+          <div class="cell border-bottom-cut">
+            ${badges[3]}
+          </div>
+        </div>
+        <!-- Vertical cut line -->
+        <div class="cut-v"></div>
+        <div class="page-num">Page ${pi + 1} of ${pages.length} · ${event.edition} Event Tags · ${tags.length} total</div>
+      </div>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${event.edition} — Event Tags (${tags.length})</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f0f0f0;
+    }
+
+    /* Page = A4 */
+    .page {
+      width: 210mm;
+      height: 297mm;
+      background: white;
+      margin: 10px auto;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      padding: 8mm;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 0;
+      flex: 1;
+    }
+
+    .cell {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 6mm;
+    }
+
+    /* ── Badge design ──────────────────────────── */
+    .badge {
+      width: 85mm;
+      height: 120mm;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 4px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      background: white;
+    }
+
+    .badge-empty {
+      border: 2px dashed #ccc;
+      background: #fafafa;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .empty-label {
+      color: #ccc;
+      font-size: 14px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+    .badge-header {
+      padding: 6px 10px;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.2;
+    }
+
+    .badge-event-name {
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+      color: white;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    .badge-event-title {
+      font-size: 8px;
+      color: rgba(255,255,255,0.85);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .badge-body {
+      flex: 1;
+      display: flex;
+      gap: 0;
+      padding: 8px 10px;
+      align-items: flex-start;
+    }
+
+    .badge-left {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .badge-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1a1a1a;
+      line-height: 1.2;
+      word-break: break-word;
+    }
+
+    .badge-category {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      width: fit-content;
+    }
+
+    .badge-tag-num {
+      font-size: 28px;
+      font-weight: 900;
+      color: #02462E;
+      letter-spacing: 0.05em;
+      line-height: 1;
+      margin-top: 4px;
+    }
+
+    .badge-ticket-ref {
+      font-size: 7.5px;
+      color: #888;
+      font-family: monospace;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-qr {
+      flex-shrink: 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
+
+    .badge-qr svg { display: block; }
+
+    .badge-footer {
+      padding: 4px 10px;
+      font-size: 7px;
+      color: #888;
+      text-align: center;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── CUT LINES ─────────────────────────────── */
+    /* Horizontal cut line between row 1 and row 2 */
+    .cut-h {
+      position: absolute;
+      bottom: 0;
+      left: -8mm;
+      right: -8mm;
+      height: 0;
+      border-bottom: 1.5px dashed #bbb;
+      pointer-events: none;
+    }
+
+    .cut-h::before, .cut-h::after {
+      content: '✂';
+      position: absolute;
+      top: -8px;
+      font-size: 12px;
+      color: #bbb;
+    }
+    .cut-h::before { left: 2mm; }
+    .cut-h::after  { right: 2mm; }
+
+    /* Vertical cut line between col 1 and col 2 */
+    .cut-v {
+      position: absolute;
+      top: 8mm;
+      bottom: 8mm;
+      left: 50%;
+      width: 0;
+      border-left: 1.5px dashed #bbb;
+      pointer-events: none;
+    }
+
+    .cut-v::before, .cut-v::after {
+      content: '✂';
+      position: absolute;
+      left: -8px;
+      font-size: 12px;
+      color: #bbb;
+      transform: rotate(90deg);
+    }
+    .cut-v::before { top: 2mm; }
+    .cut-v::after  { bottom: 2mm; }
+
+    .page-num {
+      text-align: center;
+      font-size: 8px;
+      color: #bbb;
+      padding-top: 4px;
+      letter-spacing: 0.1em;
+    }
+
+    /* ── PRINT STYLES ──────────────────────────── */
+    @media print {
+      body { background: white; }
+      .page {
+        margin: 0 !important;
+        padding: 8mm !important;
+        page-break-after: always;
+        box-shadow: none !important;
+      }
+      .no-print { display: none !important; }
+    }
+
+    /* ── SCREEN TOOLBAR ─────────────────────────── */
+    .toolbar {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      display: flex;
+      gap: 10px;
+      z-index: 100;
+    }
+    .toolbar button {
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .btn-print { background: #02462E; color: white; }
+    .btn-print:hover { background: #013a24; }
+    .btn-close { background: #e5e7eb; color: #374151; }
+  </style>
+</head>
+<body>
+
+  <!-- Toolbar (hidden on print) -->
+  <div class="toolbar no-print">
+    <button class="btn-print" onclick="window.print()">🖨️ Print Badges</button>
+    <button class="btn-close" onclick="window.close()">✕ Close</button>
+  </div>
+
+  ${pagesHtml}
+
+</body>
+</html>`;
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  } catch (e) { next(e); }
+});
+
+/* ── Generate blank tags for an event ──────────────────────────
+   POST /api/events/:eventId/tags/generate
+   Body: { count: 50, prefix: 'TAG' }
+   ─────────────────────────────────────────────────────────── */
+router.post('/events/:eventId/tags/generate', authenticate, async (req, res, next) => {
+  try {
+    const { eventId } = req.params;
+    const { count = 20, prefix = 'TAG' } = req.body;
+
+    const [[event]] = await query('SELECT id FROM events WHERE id=?', [eventId]);
+    if (!event) return res.status(404).json({ success: false, message: 'Event not found' });
+
+    // Get current max tag number for this event
+    const [[{ maxNum }]] = await query(
+      `SELECT COALESCE(MAX(CAST(SUBSTRING(tag_number, LENGTH(?)+2) AS UNSIGNED)),0) AS maxNum
+       FROM event_tags WHERE event_id=? AND tag_number LIKE ?`,
+      [prefix, eventId, `${prefix}-%`]
+    );
+
+    const generated = [];
+    for (let i = 1; i <= parseInt(count); i++) {
+      const tagNum = `${prefix}-${String(maxNum + i).padStart(3, '0')}`;
+      try {
+        const [r] = await query(
+          'INSERT INTO event_tags (event_id, tag_number) VALUES (?,?)',
+          [eventId, tagNum]
+        );
+        generated.push({ id: r.insertId, tag_number: tagNum });
+      } catch {} // skip duplicates
+    }
+
+    res.json({ success: true, data: { generated: generated.length, tags: generated }, message: `${generated.length} tags generated.` });
+  } catch (e) { next(e); }
+});
+
+export default router;

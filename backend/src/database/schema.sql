@@ -364,7 +364,24 @@ CREATE TABLE IF NOT EXISTS expense_requests (
 ) ENGINE=InnoDB;
 
 -- =============================================================
--- 17. SOUVENIRS / MERCHANDISE (Pre-order with online payment)
+-- 17. SPONSORS
+-- =============================================================
+CREATE TABLE IF NOT EXISTS sponsors (
+  id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  event_id    INT UNSIGNED NULL COMMENT 'NULL = shown on all events',
+  name        VARCHAR(150) NOT NULL,
+  logo_url    VARCHAR(500) NULL,
+  website_url VARCHAR(500) NULL,
+  tier        ENUM('title','gold','silver','bronze','media','partner') NOT NULL DEFAULT 'gold',
+  description TEXT NULL,
+  is_active   TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order  TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- =============================================================
+-- 18. SOUVENIRS / MERCHANDISE (Pre-order with online payment)
 -- =============================================================
 CREATE TABLE IF NOT EXISTS souvenirs (
   id                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -449,5 +466,6 @@ CREATE INDEX idx_lectures_event_day  ON lectures(event_id, event_day_id, s_n);
 CREATE INDEX idx_ticket_types_event  ON ticket_types(event_id, is_active, sort_order);
 CREATE INDEX idx_souvenirs_event     ON souvenirs(event_id, is_active);
 CREATE INDEX idx_souvenir_orders     ON souvenir_orders(souvenir_id, status);
+CREATE INDEX idx_sponsors_event      ON sponsors(event_id, is_active, sort_order);
 
 SET FOREIGN_KEY_CHECKS = 1;

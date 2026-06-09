@@ -371,7 +371,25 @@ async function seed() {
     log(`✅ [${status}] ${title}`);
   }
 
-  /* 16. SOUVENIRS */
+  /* 16. SPONSORS */
+  console.log('\n⭐ Sponsors...');
+  const sponsorData = [
+    // [event_id, name, logo_url, website_url, tier, sort_order]
+    [mys3Id, 'Jaiz Bank', null, 'https://www.jaizbank.com', 'title',   0],
+    [mys3Id, 'Lotus Bank', null, 'https://www.lotusbank.com', 'gold',  1],
+    [mys3Id, 'Hayat Holdings', null, null, 'gold',   2],
+    [mys3Id, 'Muslim News Nigeria', null, 'https://www.muslimnews.ng', 'media', 3],
+    [null,   'TechMuslim Foundation', null, null, 'partner', 4],
+  ];
+  for (const [eventId_, name, logo_url, website_url, tier, sort_order] of sponsorData) {
+    await q(
+      'INSERT INTO sponsors (event_id,name,logo_url,website_url,tier,is_active,sort_order) VALUES (?,?,?,?,?,1,?) ON DUPLICATE KEY UPDATE tier=VALUES(tier)',
+      [eventId_||null, name, logo_url||null, website_url||null, tier, sort_order]
+    );
+    log('✅ ' + tier.toUpperCase() + ': ' + name);
+  }
+
+  /* 17. SOUVENIRS */
   console.log('\n🛍  Souvenirs...');
   for(const [name,description,price,available_qty,sort_order] of [
     ['MYS3 T-Shirt','Premium cotton T-shirt with MYS3 design. Available in S, M, L, XL.',5000,100,0],

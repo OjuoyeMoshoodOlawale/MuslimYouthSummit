@@ -114,7 +114,7 @@
           :class="heroStep>=5?'opacity-100 translate-y-0':'opacity-0 translate-y-4'"
           style="transition:all 0.6s ease 0.2s">
           <p class="text-white/30 text-xs uppercase tracking-[0.25em] mb-3">Event Countdown</p>
-          <CountdownTimer :targetDate="eventStore.activeEvent.start_date + 'T08:00:00'" />
+          <CountdownTimer :targetDate="formatDateForTimer(eventStore.activeEvent.start_date)" />
         </div>
 
         <!-- CTAs -->
@@ -378,6 +378,34 @@
       </div>
     </section>
 
+
+    <!-- ── SPONSORS ──────────────────────────────────────── -->
+    <section v-if="sponsors.length" id="sponsors" class="py-12 md:py-16 bg-white border-t border-gray-100">
+      <div class="max-w-7xl mx-auto px-4 md:px-6">
+        <div class="text-center mb-8 reveal">
+          <p class="text-gray-400 font-bold text-xs uppercase tracking-[0.3em] mb-2">Proudly Supported By</p>
+          <h2 class="font-display font-bold text-2xl md:text-3xl text-brand-green">Our Sponsors</h2>
+        </div>
+        <!-- Group by tier -->
+        <div v-for="tier in sponsorTiers" :key="tier.name" class="mb-8 last:mb-0">
+          <p class="text-center text-xs font-bold uppercase tracking-wider text-gray-400 mb-4">{{ tier.label }}</p>
+          <div class="flex flex-wrap items-center justify-center gap-6 md:gap-10">
+            <a v-for="sp in tier.items" :key="sp.id"
+              :href="sp.website_url || '#'" :target="sp.website_url ? '_blank' : '_self'"
+              :title="sp.name"
+              class="group flex items-center justify-center grayscale hover:grayscale-0 transition-all duration-300 opacity-60 hover:opacity-100"
+              :class="tier.name === 'title' ? 'h-16' : tier.name === 'gold' ? 'h-12' : 'h-9'">
+              <img v-if="sp.logo_url" :src="sp.logo_url" :alt="sp.name"
+                class="max-h-full max-w-[160px] object-contain" />
+              <span v-else class="font-bold text-brand-green text-sm px-4 py-2 border border-brand-green/30 group-hover:bg-brand-cream">
+                {{ sp.name }}
+              </span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ── FOOTER ────────────────────────────────────────── -->
     <footer class="bg-brand-green text-white py-12 md:py-14">
       <div class="max-w-7xl mx-auto px-4 md:px-6">
@@ -446,6 +474,7 @@ const { setupReveal } = useScrollReveal();
 const scrolled       = ref(false);
 const mobileMenuOpen = ref(false);
 const gallery        = ref([]);
+const sponsors       = ref([]);
 const lectures       = ref([]);
 const eventDays      = ref([]);
 const pastEvents     = ref([]);
@@ -505,6 +534,13 @@ onMounted(async () => {
   ]);
   pastEvents.value = eventStore.pastEvents;
 
+  // Load sponsors (active event or global)
+  try {
+    const params = eventStore.activeEvent ? `?event_id=${eventStore.activeEvent.id}` : '';
+    const { data } = await api.get(`/sponsors${params}`);
+    sponsors.value = data.data || [];
+  } catch {}
+
   if (eventStore.hasActiveEvent) {
     const eid = eventStore.activeEvent.id;
     try {
@@ -528,6 +564,27 @@ onUnmounted(() => {
   window.removeEventListener('scroll', scrollHandler);
   stepTimers.forEach(clearTimeout);
 });
+
+const SPONSOR_TIER_ORDER = ['title','gold','silver','bronze','media','partner'];
+const SPONSOR_TIER_LABELS = { title:'Title Sponsor', gold:'Gold Sponsors', silver:'Silver Sponsors', bronze:'Bronze Sponsors', media:'Media Partners', partner:'Partners' };
+
+const sponsorTiers = computed(() => {
+  const byTier = {};
+  for (const sp of sponsors.value) {
+    if (!byTier[sp.tier]) byTier[sp.tier] = [];
+    byTier[sp.tier].push(sp);
+  }
+  return SPONSOR_TIER_ORDER
+    .filter(t => byTier[t]?.length)
+    .map(t => ({ name: t, label: SPONSOR_TIER_LABELS[t], items: byTier[t] }));
+});
+
+// MySQL returns dates as Date/ISO objects → extract YYYY-MM-DD part
+const formatDateForTimer = (d) => {
+  if (!d) return '';
+  const str = typeof d === 'string' ? d : new Date(d).toISOString();
+  return str.slice(0, 10) + 'T09:00:00'; // event typically starts 9am
+};
 
 const scrollTo = (id) => {
   if (id === 'top') { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
