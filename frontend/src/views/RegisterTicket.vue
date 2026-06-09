@@ -10,7 +10,7 @@
       </p>
     </div>
 
-    <div class="max-w-xl mx-auto px-6 py-12">
+    <div class="max-w-xl mx-auto px-4 md:px-6 py-10 md:py-12">
       <!-- No active event -->
       <div v-if="!eventStore.hasActiveEvent && !loading" class="text-center py-20">
         <CalendarX :size="48" class="text-gray-300 mx-auto mb-4" />
@@ -20,6 +20,7 @@
       </div>
 
       <div v-else>
+        <!-- Event header -->
         <div class="mb-8">
           <p class="text-brand-gold font-bold text-xs uppercase tracking-widest mb-2">
             {{ eventStore.activeEvent?.edition }}
@@ -27,27 +28,26 @@
           <h1 class="font-display font-bold text-3xl text-brand-green">
             {{ eventStore.activeEvent?.title }}
           </h1>
-          <p class="text-gray-500 text-sm mt-2">
-            {{ eventStore.activeEvent?.venue }} ·
-            {{ formatDate(eventStore.activeEvent?.start_date) }}
+          <p class="text-gray-500 text-sm mt-2 flex items-center gap-2">
+            <MapPin :size="13" /> {{ eventStore.activeEvent?.venue }}
+            · {{ formatDate(eventStore.activeEvent?.start_date) }}
           </p>
         </div>
 
-        <!-- Ticket type picker — grouped by participant category -->
+        <!-- Ticket type picker -->
         <div class="bg-white border border-gray-100 p-5 mb-6">
           <h2 class="font-display font-bold text-base text-brand-green mb-1">Select Your Ticket</h2>
           <p class="text-xs text-gray-400 mb-4 flex items-center gap-1">
             <Info :size="11" /> Choose the option that matches your status
           </p>
 
-          <!-- Early bird active notice -->
-          <div v-if="earlyBirdActive" class="flex items-center gap-2 bg-brand-gold/10 border border-brand-gold/30
-                text-brand-gold text-xs font-bold px-4 py-2 mb-4">
+          <!-- Early bird notice -->
+          <div v-if="earlyBirdActive"
+            class="flex items-center gap-2 bg-brand-gold/10 border border-brand-gold/30 text-brand-gold text-xs font-bold px-4 py-2 mb-4">
             <Zap :size="13" />
-            Early Bird pricing is active until {{ formatDate(eventStore.activeEvent?.early_bird_closes_at) }}
+            Early Bird pricing active until {{ formatDate(eventStore.activeEvent?.early_bird_closes_at) }}
           </div>
 
-          <!-- Group by participant category -->
           <div v-for="group in groupedTicketTypes" :key="group.category" class="mb-5 last:mb-0">
             <p v-if="group.category !== 'all' && groupedTicketTypes.length > 1"
               class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 flex items-center gap-1.5">
@@ -72,8 +72,7 @@
                   <p class="font-display font-bold text-xl text-brand-green">
                     ₦{{ fmtP(earlyBirdActive && tt.early_bird_price ? tt.early_bird_price : tt.regular_price) }}
                   </p>
-                  <div v-if="earlyBirdActive && tt.early_bird_price"
-                    class="flex items-center justify-end gap-1.5">
+                  <div v-if="earlyBirdActive && tt.early_bird_price" class="flex items-center justify-end gap-1.5">
                     <span class="text-xs text-gray-400 line-through">₦{{ fmtP(tt.regular_price) }}</span>
                     <span class="text-xs text-green-600 font-bold bg-green-50 px-1.5 py-0.5">
                       -{{ Math.round((1 - tt.early_bird_price / tt.regular_price) * 100) }}%
@@ -87,29 +86,32 @@
               </label>
             </div>
           </div>
-
           <p v-if="!eventStore.ticketTypes.length" class="text-gray-400 text-sm text-center py-4">
-            No ticket types available.
+            No ticket types available yet.
           </p>
         </div>
-        <!-- Personal details -->
+
+        <!-- Personal details + Pay -->
         <div class="bg-white border border-gray-100 p-5 mb-6">
           <h2 class="font-display font-bold text-base text-brand-green mb-4">Your Details</h2>
           <form class="space-y-4" @submit.prevent="pay" novalidate>
             <div class="grid grid-cols-2 gap-4">
               <div class="col-span-2">
-                <label class="label">Full Name *</label>
-                <input v-model="form.name" class="input" :class="{'input-error':errs.name}" placeholder="Abdullahi Musa" />
+                <label class="label">Full Name <span class="text-red-500">*</span></label>
+                <input v-model="form.name" class="input" :class="{'input-error':errs.name}"
+                  placeholder="Abdullahi Musa" autocomplete="name" />
                 <p v-if="errs.name" class="text-red-500 text-xs mt-1">{{ errs.name }}</p>
               </div>
               <div>
-                <label class="label">Email *</label>
-                <input v-model="form.email" type="email" class="input" :class="{'input-error':errs.email}" placeholder="you@email.com" />
+                <label class="label">Email <span class="text-red-500">*</span></label>
+                <input v-model="form.email" type="email" class="input" :class="{'input-error':errs.email}"
+                  placeholder="you@email.com" autocomplete="email" />
                 <p v-if="errs.email" class="text-red-500 text-xs mt-1">{{ errs.email }}</p>
               </div>
               <div>
-                <label class="label">Phone *</label>
-                <input v-model="form.phone" class="input" :class="{'input-error':errs.phone}" placeholder="080XXXXXXXX" />
+                <label class="label">Phone <span class="text-red-500">*</span></label>
+                <input v-model="form.phone" class="input" :class="{'input-error':errs.phone}"
+                  placeholder="080XXXXXXXX" autocomplete="tel" />
                 <p v-if="errs.phone" class="text-red-500 text-xs mt-1">{{ errs.phone }}</p>
               </div>
               <div>
@@ -122,29 +124,35 @@
               </div>
               <div>
                 <label class="label">Occupation</label>
-                <input v-model="form.occupation" class="input" placeholder="Student / Professional…" />
+                <input v-model="form.occupation" class="input" placeholder="Student / Engineer…" />
               </div>
             </div>
 
-            <!-- Categories are assigned on-site by admin at check-in -->
+            <!-- Error -->
+            <div v-if="serverError" class="text-red-600 text-sm bg-red-50 border border-red-100 px-4 py-3 flex items-start gap-2">
+              <AlertCircle :size="15" class="flex-shrink-0 mt-0.5" />
+              <span>{{ serverError }}</span>
+            </div>
 
-            <p v-if="serverError" class="text-red-600 text-sm bg-red-50 border border-red-100 px-4 py-3">
-              {{ serverError }}
-            </p>
-
-            <div class="pt-2 flex gap-3">
-              <button type="submit" :disabled="processing || !form.ticket_type_id"
-                class="btn-gold flex-1 justify-center py-4 text-base disabled:opacity-50 disabled:cursor-not-allowed">
+            <!-- Pay button -->
+            <div class="pt-2">
+              <button type="submit"
+                :disabled="processing || !form.ticket_type_id"
+                class="btn-gold w-full justify-center py-4 text-base disabled:opacity-50 disabled:cursor-not-allowed">
                 <span v-if="processing" class="flex items-center gap-2">
                   <span class="w-4 h-4 border-2 border-brand-green/30 border-t-brand-green rounded-full animate-spin"></span>
                   Processing…
                 </span>
-                <span v-else>Pay ₦{{ fmtP(selectedPrice) }} →</span>
+                <span v-else class="flex items-center gap-2">
+                  <CreditCard :size="16" />
+                  Pay ₦{{ fmtP(selectedPrice) }} with Paystack
+                </span>
               </button>
             </div>
 
-            <p class="text-center text-xs text-gray-400">
-              🔒 Secure payment via Paystack · You'll receive your ticket by email
+            <p class="text-center text-xs text-gray-400 flex items-center justify-center gap-1.5">
+              <ShieldCheck :size="13" class="text-green-500" />
+              Secured by Paystack · Your ticket is emailed instantly on payment
             </p>
           </form>
         </div>
@@ -157,58 +165,48 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useEventStore } from '@/stores/eventStore.js';
-import { Ticket, CalendarX, MapPin, CalendarDays, ShieldCheck, ArrowRight, Info, Zap, GraduationCap } from 'lucide-vue-next';
+import {
+  Ticket, CalendarX, MapPin, Info, Zap, GraduationCap,
+  ShieldCheck, AlertCircle, CreditCard,
+} from 'lucide-vue-next';
 import api from '@/composables/useApi.js';
 
-const router     = useRouter();
-const route      = useRoute();
-const eventStore = useEventStore();
-const loading    = ref(true);
-const processing = ref(false);
+const router      = useRouter();
+const route       = useRoute();
+const eventStore  = useEventStore();
+const loading     = ref(true);
+const processing  = ref(false);
 const serverError = ref('');
 
 const form = reactive({
-  name:'', email:'', phone:'', gender:'', occupation:'',
+  name: '', email: '', phone: '', gender: '', occupation: '',
   ticket_type_id: route.query.type ? Number(route.query.type) : null,
   category_id: null,
 });
-const errs = reactive({ name:'', email:'', phone:'' });
-
-const categories  = ref([]);
+const errs = reactive({ name: '', email: '', phone: '' });
 
 onMounted(async () => {
   await eventStore.fetchActiveEvent();
   loading.value = false;
-  if (eventStore.activeEvent) {
-    try {
-      const { data } = await api.get(`/categories`);
-      categories.value = (data.data || []).filter(c => c.is_active);
-    } catch {}
-  }
 });
 
-const isEarlyBird = computed(() =>
+const earlyBirdActive = computed(() =>
   eventStore.activeEvent?.early_bird_closes_at &&
   new Date(eventStore.activeEvent.early_bird_closes_at) > new Date()
 );
-
-// Use single computed for early bird (replaces isEarlyBird usages in template)
-const earlyBirdActive = isEarlyBird;
 
 const CATEGORY_LABELS = {
   all:           'All Participants',
   undergraduate: 'Undergraduate Students',
   graduate:      'Graduate / Postgraduate',
-  professional:  'Professionals / Alumni',
+  professional:  'Professionals & Alumni',
   other:         'Other',
 };
 
-// Group ticket types by participant_category for display
 const groupedTicketTypes = computed(() => {
-  const types = eventStore.ticketTypes;
   const groups = {};
   const order  = ['all','undergraduate','graduate','professional','other'];
-  for (const tt of types) {
+  for (const tt of (eventStore.ticketTypes || [])) {
     const cat = tt.participant_category || 'all';
     if (!groups[cat]) groups[cat] = [];
     groups[cat].push(tt);
@@ -219,41 +217,100 @@ const groupedTicketTypes = computed(() => {
 });
 
 const selectedType = computed(() =>
-  eventStore.ticketTypes.find(t => t.id === form.ticket_type_id)
+  (eventStore.ticketTypes || []).find(t => t.id === form.ticket_type_id)
 );
 
 const selectedPrice = computed(() => {
   if (!selectedType.value) return 0;
-  return isEarlyBird.value && selectedType.value.early_bird_price
+  return earlyBirdActive.value && selectedType.value.early_bird_price
     ? selectedType.value.early_bird_price
     : selectedType.value.regular_price;
 });
 
-const fmtP = (n) => Number(n || 0).toLocaleString('en-NG');
+const fmtP       = (n) => Number(n || 0).toLocaleString('en-NG');
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-NG',{day:'numeric',month:'long',year:'numeric'}) : '';
 
 const validate = () => {
-  errs.name  = form.name  ? '' : 'Name is required.';
-  errs.email = form.email && /\S+@\S+\.\S+/.test(form.email) ? '' : 'Valid email required.';
-  errs.phone = form.phone ? '' : 'Phone is required.';
+  errs.name  = form.name.trim() ? '' : 'Full name is required.';
+  errs.email = /\S+@\S+\.\S+/.test(form.email) ? '' : 'Valid email required.';
+  errs.phone = form.phone.trim() ? '' : 'Phone number is required.';
   return !Object.values(errs).some(Boolean);
+};
+
+/** Paystack inline popup flow */
+const openPaystackPopup = (authData) => {
+  return new Promise((resolve, reject) => {
+    // Load Paystack inline script if not already loaded
+    const loadScript = () => new Promise((res) => {
+      if (window.PaystackPop) { res(); return; }
+      const script = document.createElement('script');
+      script.src = 'https://js.paystack.co/v1/inline.js';
+      script.onload = res;
+      document.head.appendChild(script);
+    });
+
+    loadScript().then(() => {
+      const handler = window.PaystackPop.setup({
+        key:       authData.public_key || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
+        email:     form.email,
+        amount:    Math.round(Number(selectedPrice.value) * 100), // kobo
+        ref:       authData.reference,
+        currency:  'NGN',
+        metadata: {
+          custom_fields: [
+            { display_name: 'Full Name',     variable_name: 'name',   value: form.name },
+            { display_name: 'Ticket Number', variable_name: 'ticket', value: authData.ticket_number },
+          ],
+        },
+        onClose: () => reject(new Error('Payment window closed.')),
+        callback: (response) => resolve(response),
+      });
+      handler.openIframe();
+    });
+  });
 };
 
 const pay = async () => {
   if (!validate() || !form.ticket_type_id) return;
   serverError.value = '';
   processing.value  = true;
+
   try {
+    // 1. Initiate ticket on backend → get authorization_url + access_code
     const { data } = await api.post('/tickets/initiate', {
       ...form,
       event_id:       eventStore.activeEvent.id,
       ticket_type_id: form.ticket_type_id,
     });
-    // Redirect to Paystack authorization URL
-    window.location.href = data.data.authorization_url;
+
+    const authData = data.data;
+
+    // 2. Try Paystack popup first, fall back to redirect
+    if (window.PaystackPop || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY) {
+      try {
+        await openPaystackPopup(authData);
+        // Payment succeeded — verify and show ticket
+        router.push(`/ticket/verify?reference=${authData.reference}`);
+        return;
+      } catch (popupErr) {
+        if (popupErr.message === 'Payment window closed.') {
+          serverError.value = 'Payment cancelled. You can try again.';
+          processing.value = false;
+          return;
+        }
+        // Popup failed — fall through to redirect
+      }
+    }
+
+    // 3. Full-page redirect to Paystack (fallback)
+    if (authData.authorization_url) {
+      window.location.href = authData.authorization_url;
+    } else {
+      throw new Error('No payment URL received from server.');
+    }
   } catch (err) {
-    serverError.value = err.response?.data?.message || 'Payment initiation failed. Please try again.';
-    processing.value  = false;
+    serverError.value = err.response?.data?.message || err.message || 'Payment initiation failed. Please try again.';
+    processing.value = false;
   }
 };
 </script>

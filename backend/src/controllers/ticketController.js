@@ -86,16 +86,17 @@ export const initiateTicketPurchase = async (req, res, next) => {
     const uniqueNumber = generateTicketNumber(events[0].edition || '3', nextSeq);
     const paystackRef = generatePaystackRef('MYS');
 
-    // Validate category if provided
+    // Validate category if provided (event_categories is GLOBAL — no event_id column)
     if (category_id) {
       const [cats] = await query(
-        'SELECT id, capacity FROM event_categories WHERE id=? AND event_id=? AND is_active=1',
-        [category_id, event_id]
+        'SELECT id, capacity FROM event_categories WHERE id=? AND is_active=1',
+        [category_id]
       );
       if (!cats.length) return error(res, 'Invalid category selected.', 400);
       if (cats[0].capacity) {
         const [[{ cnt }]] = await query(
-          "SELECT COUNT(*) AS cnt FROM tickets WHERE category_id=? AND status='paid'", [category_id]
+          "SELECT COUNT(*) AS cnt FROM tickets WHERE category_id=? AND event_id=? AND status='paid'",
+          [category_id, event_id]
         );
         if (cnt >= cats[0].capacity) return error(res, 'This category is full. Please select another.', 409);
       }
@@ -128,10 +129,12 @@ export const initiateTicketPurchase = async (req, res, next) => {
 
     return success(res, {
       authorization_url: paystackData.authorization_url,
-      reference: paystackRef,
-      ticket_number: uniqueNumber,
-      amount: price,
-      is_early_bird: isEarlyBird,
+      access_code:       paystackData.access_code,
+      public_key:        process.env.PAYSTACK_PUBLIC_KEY,
+      reference:         paystackRef,
+      ticket_number:     uniqueNumber,
+      amount:            price,
+      is_early_bird:     isEarlyBird,
     }, 'Payment initiated. Complete your payment to confirm your ticket.');
   } catch (err) {
     next(err);
