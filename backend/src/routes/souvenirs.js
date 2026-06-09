@@ -108,13 +108,20 @@ router.post('/souvenirs/:id/order', async (req, res, next) => {
     const total_amount = unit_price * parseInt(quantity);
     const reference    = `SVN-${Date.now()}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
 
+    // Generate human-readable order number: SVN-25-000001
+    const [[{ orderSeq }]] = await query(
+      "SELECT COUNT(*) + 1 AS orderSeq FROM souvenir_orders"
+    );
+    const yy          = new Date().getFullYear().toString().slice(-2);
+    const order_number = `SVN-${yy}-${String(orderSeq).padStart(6,'0')}`;
+
     // Create pending order
     const [r] = await query(
       `INSERT INTO souvenir_orders
-         (souvenir_id, buyer_name, buyer_email, buyer_phone, quantity, unit_price,
+         (order_number, souvenir_id, buyer_name, buyer_email, buyer_phone, quantity, unit_price,
           total_amount, status, paystack_reference, delivery_address, notes)
-       VALUES (?,?,?,?,?,?,?,'pending',?,?,?)`,
-      [sv.id, buyer_name.trim(), buyer_email.toLowerCase(), buyer_phone || null,
+       VALUES (?,?,?,?,?,?,?,?,'pending',?,?,?)`,
+      [order_number, sv.id, buyer_name.trim(), buyer_email.toLowerCase(), buyer_phone || null,
        parseInt(quantity), unit_price, total_amount, reference,
        delivery_address || null, notes || null]
     );

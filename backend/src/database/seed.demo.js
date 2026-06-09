@@ -532,7 +532,43 @@ Attendees will benefit from:
        VALUES (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE price=VALUES(price)`,
       [mys3Id,name,description,price,available_qty,image_url,sort_order]
     );
+
     log(`✅ ${name} — ₦${price.toLocaleString()}`);
+  }
+
+  /* 17-extra. DEMO SOUVENIR ORDERS (so admin orders tab is not empty) */
+  {
+    const [svRows] = await q('SELECT id, price FROM souvenirs WHERE event_id=? ORDER BY sort_order', [mys3Id]);
+    const yy2 = new Date().getFullYear().toString().slice(-2);
+    const demos = [
+      ['Fatima Ibrahim',    'fatima.ibrahim@yahoo.com', '08022222222', 1, 'paid',      2],
+      ['Abdullahi Musa',    'abdullahi.musa@gmail.com', '08011111111', 2, 'paid',      5],
+      ['Hajiya Bilkisu',    'bilkisu@gmail.com',         '08055000001', 1, 'delivered', 7],
+      ['Ahmed Bello',       'ahmed.bello@outlook.com',   '08066000002', 1, 'pending',   1],
+    ];
+    for (let i = 0; i < demos.length; i++) {
+      const [bname, bemail, bphone, qty, status, dAgo] = demos[i];
+      const sv        = svRows[i % svRows.length];
+      if (!sv) continue;
+      const unitPrice = parseFloat(sv.price);
+      const total     = unitPrice * qty;
+      const orderNum  = `SVN-${yy2}-${String(i + 1).padStart(6,'0')}`;
+      const ref       = `DEMO-SVN-${randomUUID().slice(0,8).toUpperCase()}`;
+      const isPaid    = ['paid','delivered'].includes(status);
+      if (isPaid) {
+        await q(
+          `INSERT IGNORE INTO souvenir_orders (order_number,souvenir_id,buyer_name,buyer_email,buyer_phone,quantity,unit_price,total_amount,status,paystack_reference,paid_at) VALUES (?,?,?,?,?,?,?,?,?,?,DATE_SUB(NOW(),INTERVAL ? DAY))`,
+          [orderNum, sv.id, bname, bemail, bphone, qty, unitPrice, total, status, ref, dAgo]
+        );
+        await q('UPDATE souvenirs SET sold_qty=sold_qty+? WHERE id=?', [qty, sv.id]);
+      } else {
+        await q(
+          `INSERT IGNORE INTO souvenir_orders (order_number,souvenir_id,buyer_name,buyer_email,buyer_phone,quantity,unit_price,total_amount,status,paystack_reference) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+          [orderNum, sv.id, bname, bemail, bphone, qty, unitPrice, total, status, ref]
+        );
+      }
+    }
+    log(`✅ 4 demo souvenir orders (2 paid, 1 delivered, 1 pending)`);
   }
 
   /* 17. SPONSORS — with appropriate logo URLs */
@@ -585,7 +621,7 @@ Attendees will benefit from:
   console.log('  │   7-day ticket growth snapshots for dashboard chart');
   console.log('  • 2 email campaigns (1 draft, 1 sent)');
   console.log('  • 8 expense requests (paid:2, approved:3, pending:2, rejected:1)');
-  console.log('  • 4 souvenirs with Unsplash product images');
+  console.log('  • 4 souvenirs with Unsplash product images + 4 demo orders');
   console.log('  • 6 sponsors with logo URLs (clearbit + Unsplash)');
   console.log('\n  SETUP COMMAND:');
   console.log('  mysql -u root -p');
