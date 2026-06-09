@@ -2,7 +2,7 @@ import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { query } from '../database/db.js';
 import { success, created, error, notFound } from '../utils/response.js';
-import { paystackRequest } from '../services/paystackService.js';
+import { initializeTransaction, verifyTransaction } from '../services/paystackService.js';
 
 const router = express.Router();
 const adm    = [authenticate, authorize('super_admin', 'admin')];
@@ -120,20 +120,20 @@ router.post('/souvenirs/:id/order', async (req, res, next) => {
     );
 
     // Initiate Paystack
-    const payRes = await paystackRequest('POST', '/transaction/initialize', {
-      email:     buyer_email.toLowerCase(),
-      amount:    Math.round(total_amount * 100), // kobo
+    const payData = await initializeTransaction({
+      email:        buyer_email.toLowerCase(),
+      amount:       Math.round(total_amount * 100), // kobo
       reference,
-      metadata:  { souvenir_id: sv.id, order_id: r.insertId, buyer_name, souvenir_name: sv.name, quantity },
+      metadata:     { souvenir_id: sv.id, order_id: r.insertId, buyer_name, souvenir_name: sv.name, quantity },
       callback_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/shop/verify?ref=${reference}`,
     });
 
     created(res, {
-      order_id:       r.insertId,
+      order_id:    r.insertId,
       reference,
-      payment_url:    payRes.data?.authorization_url,
-      access_code:    payRes.data?.access_code,
-      total:          total_amount,
+      payment_url: payData.authorization_url,
+      access_code: payData.access_code,
+      total:       total_amount,
     }, `Order placed. Complete payment to confirm.`);
   } catch (e) { next(e); }
 });
@@ -151,8 +151,8 @@ router.get('/souvenirs/verify/:reference', async (req, res, next) => {
     const order = orders[0];
     if (order.status === 'paid') return success(res, order, 'Already confirmed.');
 
-    const verRes = await paystackRequest('GET', `/transaction/verify/${reference}`);
-    if (verRes.data?.status !== 'success')
+    const verData = await verifyTransaction(reference);
+    if (verData.status !== 'success')
       return error(res, 'Payment not confirmed yet.', 402);
 
     // Mark paid
