@@ -395,7 +395,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import {
   Loader, Pencil, Trash2, Copy, Plus, Save, Radio, CheckCircle2,
   CalendarCheck, Ticket, Mic, Mail, Phone, Youtube,
@@ -405,8 +405,11 @@ import ConfirmModal from '@/components/common/ConfirmModal.vue';
 import { useAlertStore } from '@/stores/alertStore.js';
 import api from '@/composables/useApi.js';
 
-const props  = defineProps({ id: { type: [String, Number], required: true } });
-const router = useRouter();
+const routerRef = useRouter();
+const routeRef  = useRoute();
+const router = routerRef;
+// Get event id from route params (works with or without props:true in router)
+const props  = { id: routeRef.params.id };
 const alert  = useAlertStore();
 
 const event   = ref(null);

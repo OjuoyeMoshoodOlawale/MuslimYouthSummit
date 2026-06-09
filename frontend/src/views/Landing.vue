@@ -423,16 +423,20 @@
           </RouterLink>
         </div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <RouterLink v-for="sv in featuredSouvenirs" :key="sv.id" to="/shop"
-            class="bg-white/10 hover:bg-white/20 border border-white/20 hover:border-brand-gold/50 transition-all p-4 text-center group">
-            <div class="h-24 flex items-center justify-center mb-3">
+          <div v-for="sv in featuredSouvenirs" :key="sv.id"
+            class="bg-white/10 border border-white/20 hover:border-brand-gold/50 transition-all p-4 text-center group flex flex-col">
+            <div class="h-24 flex items-center justify-center mb-3 cursor-pointer" @click="openShopItem(sv)">
               <img v-if="sv.image_url" :src="sv.image_url" :alt="sv.name"
-                class="max-h-full max-w-full object-contain" />
+                class="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform" />
               <Package v-else :size="40" class="text-white/30" />
             </div>
             <p class="text-white font-semibold text-sm group-hover:text-brand-gold transition-colors">{{ sv.name }}</p>
             <p class="text-brand-gold font-display font-bold mt-1">₦{{ fmtP(sv.price) }}</p>
-          </RouterLink>
+            <button class="mt-3 w-full py-2 text-xs font-bold bg-brand-gold/20 border border-brand-gold/40 text-brand-gold hover:bg-brand-gold hover:text-brand-green transition-all"
+              @click="openShopItem(sv)">
+              Buy Now
+            </button>
+          </div>
         </div>
       </div>
     </section>
@@ -657,6 +661,11 @@ const formatDateForTimer = (d) => {
 };
 
 const fmtP = (n) => Number(n||0).toLocaleString('en-NG');
+
+const openShopItem = (sv) => {
+  // Redirect to /shop — the shop page has the buy modal
+  router.push({ path: '/shop', query: { buy: sv.id } });
+};
 
 const scrollTo = (id) => {
   if (id === 'top') { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }

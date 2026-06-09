@@ -164,6 +164,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useForm, validators as v } from '@/composables/useForm.js';
 import { useEventStore } from '@/stores/eventStore.js';
 import {
   Ticket, CalendarX, MapPin, Info, Zap, GraduationCap,
@@ -178,12 +179,15 @@ const loading     = ref(true);
 const processing  = ref(false);
 const serverError = ref('');
 
-const form = reactive({
+const { form, errs, saving: _saving, serverError: _se, handleSubmit, validate, reset } = useForm({
   name: '', email: '', phone: '', gender: '', occupation: '',
   ticket_type_id: route.query.type ? Number(route.query.type) : null,
   category_id: null,
+}, {
+  name:  v.required('Full name'),
+  email: v.email(),
+  phone: v.required('Phone number'),
 });
-const errs = reactive({ name: '', email: '', phone: '' });
 
 onMounted(async () => {
   await eventStore.fetchActiveEvent();
@@ -230,12 +234,7 @@ const selectedPrice = computed(() => {
 const fmtP       = (n) => Number(n || 0).toLocaleString('en-NG');
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-NG',{day:'numeric',month:'long',year:'numeric'}) : '';
 
-const validate = () => {
-  errs.name  = form.name.trim() ? '' : 'Full name is required.';
-  errs.email = /\S+@\S+\.\S+/.test(form.email) ? '' : 'Valid email required.';
-  errs.phone = form.phone.trim() ? '' : 'Phone number is required.';
-  return !Object.values(errs).some(Boolean);
-};
+// Validation handled by useForm
 
 /** Paystack inline popup flow */
 const openPaystackPopup = (authData) => {

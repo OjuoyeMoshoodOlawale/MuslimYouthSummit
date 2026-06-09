@@ -32,7 +32,7 @@ const AdminExpenses       = () => import('@/views/admin/AdminExpenses.vue');
 const AdminSettings       = () => import('@/views/admin/AdminSettings.vue');
 const AdminSouvenirs      = () => import('@/views/admin/AdminSouvenirs.vue');
 const AdminSponsors       = () => import('@/views/admin/AdminSponsors.vue');
-const Souvenirs           = () => import('@/views/Souvenirs.vue');
+const Souvenirs           = () => import('@/views/SouvenirShop.vue');
 
 /* ─── Roles shorthand ────────────────────────────────────── */
 const ALL_ADMIN  = ['super_admin','admin','attendant','department'];
