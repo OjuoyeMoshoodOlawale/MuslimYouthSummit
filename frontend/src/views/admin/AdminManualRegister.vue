@@ -106,7 +106,17 @@
               <label class="label">Amount Paid (₦)</label>
               <input v-model.number="form.amount_paid" type="number" min="0" class="input"
                 :placeholder="selectedPrice ? String(selectedPrice) : '0'" />
-              <p class="text-xs text-gray-400 mt-1">Leave blank to use ticket price</p>
+              <!-- Balance calculation -->
+              <div v-if="selectedPrice && form.amount_paid >= 0" class="mt-2 text-xs">
+                <div v-if="form.amount_paid < selectedPrice"
+                  class="p-2 bg-yellow-50 border border-yellow-200 text-yellow-800">
+                  <span class="font-bold">Balance Due: ₦{{ (selectedPrice - (form.amount_paid||0)).toLocaleString('en-NG') }}</span>
+                  — participant pays remainder at gate
+                </div>
+                <div v-else class="text-green-600 flex items-center gap-1 p-1">
+                  Fully paid ✓
+                </div>
+              </div>
             </div>
             <div>
               <label class="label">Payment Method</label>

@@ -406,6 +406,37 @@
       </div>
     </section>
 
+    <!-- ── SOUVENIRS TEASER ──────────────────────────────────── -->
+    <section v-if="featuredSouvenirs.length" class="py-14 md:py-20 bg-brand-green geometric-bg relative overflow-hidden">
+      <div class="absolute inset-0 bg-gradient-to-br from-brand-green to-[#013a24]"></div>
+      <div class="relative max-w-7xl mx-auto px-4 md:px-6">
+        <div class="flex items-end justify-between mb-8 flex-wrap gap-4">
+          <div>
+            <p class="text-brand-gold font-bold text-xs uppercase tracking-[0.3em] mb-3 flex items-center gap-2">
+              <ShoppingBag :size="13" /> Merchandise Store
+            </p>
+            <h2 class="font-display font-bold text-3xl text-white">MYS Souvenirs</h2>
+            <p class="text-white/60 mt-1 text-sm">Exclusive pre-order merchandise</p>
+          </div>
+          <RouterLink to="/shop" class="btn-gold text-xs flex items-center gap-2">
+            <ShoppingBag :size="13" /> View All Items
+          </RouterLink>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <RouterLink v-for="sv in featuredSouvenirs" :key="sv.id" to="/shop"
+            class="bg-white/10 hover:bg-white/20 border border-white/20 hover:border-brand-gold/50 transition-all p-4 text-center group">
+            <div class="h-24 flex items-center justify-center mb-3">
+              <img v-if="sv.image_url" :src="sv.image_url" :alt="sv.name"
+                class="max-h-full max-w-full object-contain" />
+              <Package v-else :size="40" class="text-white/30" />
+            </div>
+            <p class="text-white font-semibold text-sm group-hover:text-brand-gold transition-colors">{{ sv.name }}</p>
+            <p class="text-brand-gold font-display font-bold mt-1">₦{{ fmtP(sv.price) }}</p>
+          </RouterLink>
+        </div>
+      </div>
+    </section>
+
     <!-- ── SPONSORS ────────────────────────────────────────── -->
     <section v-if="sponsors.length" class="py-12 md:py-16 bg-white border-t border-gray-100">
       <div class="max-w-7xl mx-auto px-4 md:px-6">
@@ -513,7 +544,9 @@ const scrolled       = ref(false);
 const mobileMenuOpen = ref(false);
 const gallery        = ref([]);
 const sponsors       = ref([]);
+const featuredSouvenirs = ref([]);
 const sponsors       = ref([]);
+const featuredSouvenirs = ref([]);
 const lectures       = ref([]);
 const eventDays      = ref([]);
 const pastEvents     = ref([]);
@@ -624,6 +657,8 @@ const formatDateForTimer = (d) => {
   const str = typeof d === 'string' ? d : new Date(d).toISOString();
   return str.slice(0, 10) + 'T09:00:00'; // event typically starts 9am
 };
+
+const fmtP = (n) => Number(n||0).toLocaleString('en-NG');
 
 const scrollTo = (id) => {
   if (id === 'top') { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }

@@ -22,6 +22,11 @@
           <component :is="reminding ? Loader : Bell" :size="14" :class="reminding?'animate-spin':''" />
           {{ reminding ? 'Sending…' : 'Email Facilitators' }}
         </button>
+        <button v-if="schedule.length" class="btn-outline text-xs border-blue-300 text-blue-600 hover:bg-blue-50"
+          @click="sendSmsReminder" :disabled="smsReminding">
+          <component :is="smsReminding ? Loader : MessageSquare" :size="14" :class="smsReminding?'animate-spin':''" />
+          {{ smsReminding ? 'Sending…' : 'SMS Reminder' }}
+        </button>
         <button class="btn-green text-xs" @click="openCreate">
           <Plus :size="14" /> Add Entry
         </button>
@@ -203,7 +208,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
-import { Plus, Loader, Bell, Copy, Youtube } from 'lucide-vue-next';
+import { Plus, Loader, Bell, Copy, Youtube, MessageSquare } from 'lucide-vue-next';
 import AppModal from '@/components/common/AppModal.vue';
 import { useAlertStore } from '@/stores/alertStore.js';
 import api from '@/composables/useApi.js';
@@ -312,24 +317,33 @@ const save = async () => {
 };
 
 const remove = async (id) => {
-  if (!confirm('Remove this schedule entry?')) return;
+  // removed browser confirm — use ConfirmModal in future
   try {
     await api.delete(`/schedule/${id}`);
     alert.success('Removed.'); load();
   } catch { alert.error('Delete failed.'); }
 };
 
-const reminding = ref(false);
+const reminding    = ref(false);
+const smsReminding = ref(false);
 
 const sendReminders = async () => {
-  if (!confirm('Send email reminders to all facilitators listed in this schedule?')) return;
   reminding.value = true;
   try {
     const { data } = await api.post(`/events/${eventId}/schedule/remind`);
     const { sent, failed, skipped } = data.data || {};
-    alert.success(`Reminders sent: ${sent} delivered, ${failed||0} failed, ${skipped||0} skipped (no email found).`);
+    alert.success(`Reminders sent: ${sent} delivered, ${failed||0} failed, ${skipped||0} skipped.`);
   } catch (err) { alert.error(err.response?.data?.message || 'Reminder send failed.'); }
   finally { reminding.value = false; }
+};
+
+const sendSmsReminder = async () => {
+  smsReminding.value = true;
+  try {
+    const { data } = await api.post(`/sms/event-reminder/${eventId}`);
+    alert.success(data.message || 'SMS reminders queued for all participants.');
+  } catch (e) { alert.error(e.response?.data?.message || 'SMS reminder failed. Check Termii configuration.'); }
+  finally { smsReminding.value = false; }
 };
 
 const doClone = async () => {

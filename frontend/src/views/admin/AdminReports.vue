@@ -172,6 +172,9 @@ const daily         = ref({});
 onMounted(async () => {
   const { data } = await api.get('/events');
   events.value = data.data || [];
+  // Default to active event
+  const active = events.value.find(e => e.status === 'active');
+  if (active && !selectedEvent.value) { selectedEvent.value = active.id; load(); }
   const active = events.value.find(e => e.status === 'active');
   if (active) { selectedEvent.value = active.id; load(); }
 });

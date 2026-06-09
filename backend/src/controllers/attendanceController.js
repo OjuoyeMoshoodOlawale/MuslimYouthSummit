@@ -144,6 +144,18 @@ export const assignTagAndCheckIn = async (req, res, next) => {
       }
     } catch {}
 
+    // Send check-in SMS (non-blocking)
+    try {
+      const { sendSMS: sendSms, smsTemplates } = await import('../services/smsService.js');
+      if (parts.length && parts[0].phone) {
+        sendSms(parts[0].phone, smsTemplates.checkIn(
+          parts[0].name || 'Participant',
+          parts[0].event_title || 'the event',
+          tag_number || 'assigned at gate'
+        )).catch(() => {});
+      }
+    } catch {}
+
     return success(res, { tag_number, ticket_id }, `Check-in complete!${tagMsg}`);
   } catch (e) { next(e); }
 };

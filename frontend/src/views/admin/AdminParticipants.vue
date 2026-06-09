@@ -4,6 +4,9 @@
     <div class="flex items-center justify-between flex-wrap gap-3">
       <h2 class="font-display font-bold text-xl text-brand-green">Participants</h2>
       <div class="flex gap-2 flex-wrap">
+        <button class="btn-outline text-xs" @click="smsModal=true">
+          <MessageSquare :size="13" /> Bulk SMS
+        </button>
         <RouterLink to="/admin/register" class="btn-green text-xs">
           <UserPlus :size="13" /> Manual Register
         </RouterLink>
@@ -247,16 +250,19 @@
         </div>
       </div>
 
-      <!-- Hostel assignment -->
-      <div v-if="availableHostels.length">
+      <!-- Hostel assignment — filtered by participant gender -->
+      <div v-if="genderFilteredHostels.length">
         <label class="label">Assign Hostel <span class="text-gray-400 font-normal text-xs">(optional)</span></label>
         <select v-model="checkInForm.hostel_id" class="input text-sm">
-          <option :value="null">No hostel</option>
-          <option v-for="h in availableHostels" :key="h.id" :value="h.id"
+          <option :value="null">No hostel assignment</option>
+          <option v-for="h in genderFilteredHostels" :key="h.id" :value="h.id"
             :disabled="h.remaining <= 0">
             {{ h.name }} ({{ h.gender }}) — {{ h.remaining }} beds left
           </option>
         </select>
+        <p v-if="!genderFilteredHostels.length" class="text-xs text-gray-400 mt-1">
+          No hostels available for {{ selected?.gender || 'this participant' }}.
+        </p>
         <input v-if="checkInForm.hostel_id" v-model="checkInForm.room_number"
           class="input text-sm mt-2" placeholder="Room number (optional)" />
       </div>
@@ -290,13 +296,41 @@
       </div>
     </div>
   </AppModal>
+
+  <!-- Bulk SMS Modal -->
+  <AppModal v-model="smsModal" title="Send Bulk SMS" size="md">
+    <div class="space-y-4">
+      <div class="bg-blue-50 border border-blue-100 p-3 text-xs text-blue-700">
+        SMS will be sent to all participants matching your current filters
+        (event: {{ filters.event_id ? 'selected' : 'all' }},
+        category: {{ filters.category_id ? 'selected' : 'all' }},
+        status: {{ filters.checked_in || 'all' }}).
+        <strong>{{ pagination.total || 0 }} recipients.</strong>
+      </div>
+      <div>
+        <label class="label">Message <span class="text-red-500">*</span></label>
+        <textarea v-model="smsForm.message" class="input text-sm" rows="4"
+          placeholder="Type your SMS message here… (160 chars per SMS)"
+          maxlength="320"></textarea>
+        <p class="text-xs text-gray-400 mt-1 text-right">{{ smsForm.message.length }} / 320 chars</p>
+      </div>
+      <div class="flex gap-2 pt-2 border-t border-gray-100">
+        <button class="btn-green text-xs flex items-center gap-2" :disabled="smsForm.sending || !smsForm.message"
+          @click="sendBulkSms">
+          <component :is="smsForm.sending ? Loader : MessageSquare" :size="14" :class="smsForm.sending?'animate-spin':''" />
+          {{ smsForm.sending ? 'Sending…' : `Send to ${pagination.total||0} recipients` }}
+        </button>
+        <button class="btn-ghost text-xs" @click="smsModal=false">Cancel</button>
+      </div>
+    </div>
+  </AppModal>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import {
   Users, UserPlus, Search, X, ShieldCheck, Banknote, ReceiptText,
-  Loader, AlertTriangle, QrCode, LogOut, Eye, Mail, CheckCircle2, XCircle, Award,
+  Loader, AlertTriangle, QrCode, LogOut, Eye, Mail, CheckCircle2, XCircle, Award, MessageSquare,
 } from 'lucide-vue-next';
 import AppModal from '@/components/common/AppModal.vue';
 import { useAlertStore } from '@/stores/alertStore.js';
@@ -310,6 +344,14 @@ const rows       = ref([]);
 const events     = ref([]);
 const categories = ref([]);
 const availableHostels = ref([]);
+
+const genderFilteredHostels = computed(() => {
+  const gender = selected.value?.gender;
+  if (!gender || gender === 'prefer_not_to_say') return availableHostels.value;
+  return availableHostels.value.filter(h =>
+    h.gender === 'mixed' || h.gender === gender
+  );
+});
 const loading    = ref(false);
 const pagination = ref({ total:0, page:1, pages:1, from:0, to:0 });
 const summaryStats = ref({ checked_in:0, partial:0, revenue:0 });
@@ -461,6 +503,23 @@ const doCheckOut = async () => {
     load();
   } catch (e) { alert.error(e.response?.data?.message || 'Check-out failed.'); }
   finally { checkingOut.value = false; }
+};
+
+const sendBulkSms = async () => {
+  if (!smsForm.message.trim()) return;
+  smsForm.sending = true;
+  try {
+    const params = {};
+    if (filters.event_id)    params.event_id    = filters.event_id;
+    if (filters.category_id) params.category_id = filters.category_id;
+    if (filters.checked_in === '1') params.checked_in = '1';
+    if (filters.checked_in === '0') params.not_checked_in = '1';
+    await api.post('/sms/bulk', { ...params, message: smsForm.message });
+    alert.success('SMS queued for sending!');
+    smsModal.value = false;
+    smsForm.message = '';
+  } catch (e) { alert.error(e.response?.data?.message || 'SMS failed.'); }
+  finally { smsForm.sending = false; }
 };
 
 const emailParticipant = (row) => {

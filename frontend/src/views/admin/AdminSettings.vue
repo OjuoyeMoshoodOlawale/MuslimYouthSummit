@@ -111,6 +111,33 @@
       </button>
     </div>
 
+    <!-- SMS Configuration -->
+    <div class="bg-white border border-gray-100 p-6 space-y-4">
+      <h3 class="font-display font-bold text-brand-green border-b border-gray-100 pb-3 flex items-center gap-2">
+        <MessageSquare :size="16" /> SMS Notifications (Termii)
+      </h3>
+      <div v-if="smsStatus === null" class="flex items-center gap-2 text-gray-400 text-sm">
+        <Loader :size="14" class="animate-spin" /> Checking SMS configuration…
+      </div>
+      <div v-else-if="smsStatus.configured" class="flex items-center gap-3 bg-green-50 border border-green-100 p-4">
+        <CheckCircle2 :size="20" class="text-green-600 flex-shrink-0" />
+        <div>
+          <p class="font-semibold text-green-800 text-sm">Termii SMS is configured</p>
+          <p class="text-xs text-green-700">Balance: {{ smsStatus.currency }} {{ smsStatus.balance }} · Provider: {{ smsStatus.provider }}</p>
+        </div>
+      </div>
+      <div v-else class="bg-yellow-50 border border-yellow-100 p-4">
+        <p class="font-semibold text-yellow-800 text-sm flex items-center gap-2"><AlertTriangle :size="14" /> SMS not configured</p>
+        <p class="text-xs text-yellow-700 mt-1">Add your Termii API key to <code class="bg-yellow-100 px-1">.env</code>:</p>
+        <pre class="text-xs bg-yellow-100 p-2 mt-2 overflow-x-auto">TERMII_API_KEY=your_termii_api_key
+TERMII_SENDER_ID=MYSummit
+TERMII_CHANNEL=generic</pre>
+        <a href="https://app.termii.com" target="_blank" class="text-xs text-brand-green hover:underline mt-2 flex items-center gap-1">
+          Get API key at termii.com →
+        </a>
+      </div>
+    </div>
+
     <!-- Danger zone -->
     <div class="bg-red-50 border border-red-100 p-6">
       <h3 class="font-display font-bold text-red-600 border-b border-red-100 pb-3 flex items-center gap-2 mb-4">
@@ -128,7 +155,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { User, Lock, Save, Loader, Settings2, AlertTriangle, LogOut } from 'lucide-vue-next';
+import { User, Lock, Save, Loader, Settings2, AlertTriangle, LogOut, MessageSquare, CheckCircle2 } from 'lucide-vue-next';
 import { useAuthStore }  from '@/stores/authStore.js';
 import { useAlertStore } from '@/stores/alertStore.js';
 import api from '@/composables/useApi.js';
@@ -143,6 +170,7 @@ const savingProfile = ref(false);
 const pwForm  = reactive({ current:'', new_pass:'', confirm:'' });
 const pwErrs  = reactive({ current:'', new_pass:'', confirm:'' });
 const savingPw = ref(false);
+const smsStatus = ref(null);
 
 const prefs = reactive({
   email_notifications: true,
@@ -200,4 +228,7 @@ const savePrefs = () => {
 };
 
 const logout = () => { auth.logout(); router.push('/admin/login'); };
+
+// Load SMS status
+api.get('/sms/status').then(({ data }) => { smsStatus.value = data.data; }).catch(() => { smsStatus.value = { configured: false, error: 'Unable to check' }; });
 </script>

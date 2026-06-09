@@ -28,6 +28,7 @@ import ticketTypeRoutes  from './routes/ticketTypes.js';
 import expenseRoutes     from './routes/expenses.js';
 import souvenirRoutes    from './routes/souvenirs.js';
 import sponsorRoutes     from './routes/sponsors.js';
+import smsRoutes         from './routes/sms.js';
 import tagPrintRoutes    from './routes/tagPrint.js';
 import { cloneEvent }    from './controllers/cloneController.js';
 import { authenticate, authorize } from './middleware/auth.js';
@@ -116,6 +117,7 @@ app.use('/api', ticketTypeRoutes);
 app.use('/api', expenseRoutes);
 app.use('/api', souvenirRoutes);
 app.use('/api', sponsorRoutes);
+app.use('/api', smsRoutes);
 app.use('/api', tagPrintRoutes);
 app.post('/api/events/clone', authenticate, authorize('super_admin','admin'), cloneEvent);
 
