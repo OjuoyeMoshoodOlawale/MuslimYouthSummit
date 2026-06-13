@@ -170,9 +170,11 @@ router.get('/certificate/:ref', async (req, res, next) => {
 
     const cert = rows[0];
 
-    // Certificate only available once the event is completed
-    if (cert.event_status !== 'completed') {
-      return err(res, 'Your certificate will be available once the event is completed.', 403);
+    // Certificate available once the event is completed OR its end date has passed
+    const endPassed = cert.end_date && new Date(cert.end_date) < new Date();
+    const isReady   = cert.event_status === 'completed' || endPassed;
+    if (!isReady) {
+      return err(res, 'Your certificate will be available after the event has concluded.', 403);
     }
 
     ok(res, cert);
