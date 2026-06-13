@@ -69,20 +69,17 @@ const wrap = (content) => `
 </body>
 </html>`;
 
-/* ── Core send function with logging ─────────────────────── */
+/* ── Core send function ───────────────────────────────────── */
 const send = async ({ to, subject, html }) => {
   const t = createTransporter();
-
-  // Verify connection first (catches wrong credentials early)
-  await t.verify();
-
+  // Note: verify() removed from here — it adds 300ms per email.
+  // Use `node scripts/test-email.js` to verify SMTP config.
   const info = await t.sendMail({
     from:    process.env.EMAIL_FROM || `Muslim Youth Summit <${process.env.SMTP_USER}>`,
     to,
     subject,
     html,
   });
-
   console.log(`  [Email] Sent to ${to} — MessageId: ${info.messageId}`);
   return info;
 };

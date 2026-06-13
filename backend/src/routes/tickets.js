@@ -112,7 +112,13 @@ router.post('/manual', authenticate, authorize('super_admin','admin','department
       event_venue: events[0].venue, event_start_date: events[0].start_date,
     };
 
-    if (send_email) sendTicketEmail(ticket).catch(console.error);
+    // Send ticket confirmation email
+    if (send_email) {
+      console.log(`  [Email] Sending ticket to ${email}…`);
+      sendTicketEmail(ticket)
+        .then(() => console.log(`  [Email] ✅ Sent to ${email}`))
+        .catch((e) => console.error(`  [Email] ❌ FAILED for ${email}: ${e.message}`));
+    }
 
     ok(res, ticket, `Ticket ${uniqueNumber} created for ${name}.`);
   } catch (e) { next(e); }
