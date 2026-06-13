@@ -1,4 +1,5 @@
-import nodemailer from 'nodemailer';
+import nodemailer          from 'nodemailer';
+import { generateQRCodePNG, ticketQRData } from './qrcodeService.js';
 
 /* ── Transporter ──────────────────────────────────────────── */
 const createTransporter = () => {
@@ -110,110 +111,250 @@ export const sendTestEmail = async (to) => {
   return send({ to, subject: 'MYS Platform — Email Test', html });
 };
 
-/** Ticket confirmation email */
+/** Ticket confirmation email — styled to match the printed ticket */
 export const sendTicketEmail = async (ticket) => {
-  const dateStr = ticket.event_start_date
-    ? new Date(ticket.event_start_date).toLocaleDateString('en-NG',
-        { weekday:'long', day:'numeric', month:'long', year:'numeric' })
-    : ticket.start_date || 'See event details';
+  // Generate QR code as base64 PNG (works in all email clients)
+  let qrDataUrl = '';
+  try {
+    const qrData = ticketQRData(ticket.unique_number);
+    qrDataUrl = await generateQRCodePNG(qrData);
+  } catch { /* QR generation failed — email still sends without it */ }
 
-  const qrBlock = ticket.qr_code_svg
-    ? `<div style="text-align:center;margin:24px 0;padding:20px;background:${B.cream}">
-        <p style="color:#666;font-size:13px;margin:0 0 12px;font-weight:600">Your Entry QR Code</p>
-        <div style="display:inline-block">${ticket.qr_code_svg}</div>
-        <p style="color:#999;font-size:11px;margin:12px 0 0">Present this at the event gate</p>
-      </div>`
-    : '';
+  const fmtDate = (d) => {
+    if (!d) return 'See event details';
+    try {
+      return new Date(d).toLocaleDateString('en-NG', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+      });
+    } catch { return String(d).slice(0, 10); }
+  };
 
-  const html = wrap(`
-    <h2 style="color:${B.green};font-size:22px;font-weight:800;margin:0 0 8px">
-      Ticket Confirmed!
-    </h2>
-    <p style="color:#555;font-size:15px;margin:0 0 24px;line-height:1.7">
-      Assalamu Alaikum <strong>${ticket.participant_name}</strong>,<br/>
-      Your registration for <strong>${ticket.event_title}</strong> is confirmed.
-      Barakallahu feek!
-    </p>
+  const fmtMoney = (n) => `NGN ${Number(n || 0).toLocaleString('en-NG')}`;
 
-    <!-- Ticket details -->
-    <table width="100%" cellpadding="0" cellspacing="0"
-      style="background:${B.green};border-radius:4px;padding:20px 24px;margin-bottom:24px">
+  const hasBalance = Number(ticket.balance_due) > 0;
+  const eventDate  = fmtDate(ticket.event_start_date || ticket.start_date);
+  const venue      = ticket.event_venue || ticket.venue || 'Venue TBA';
+  const edition    = ticket.edition || '';
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+</head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:'Segoe UI',Arial,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:24px 0">
+  <tr><td align="center">
+
+    <!--  OUTER CARD  -->
+    <table width="560" cellpadding="0" cellspacing="0"
+      style="background:#ffffff;max-width:560px;width:100%;border:1px solid #e0e0e0">
+
+      <!-- ══ HEADER — dark green ══ -->
       <tr>
-        <td style="padding:8px 0">
-          <p style="color:${B.gold};font-size:10px;font-weight:700;letter-spacing:2px;margin:0 0 4px;text-transform:uppercase">
+        <td style="background:#02462E;padding:28px 32px">
+          <!-- Logo / brand -->
+          <p style="color:#FEC700;font-size:10px;font-weight:700;letter-spacing:4px;
+                     margin:0 0 4px;text-transform:uppercase">
+            Muslim Youth Summit
+          </p>
+          <h1 style="color:#ffffff;font-size:26px;font-weight:900;margin:0 0 10px;
+                      line-height:1.1;letter-spacing:-0.5px">
+            ${ticket.event_title || 'MYS Event'}
+          </h1>
+          <!-- Venue & date row -->
+          <table cellpadding="0" cellspacing="0" width="100%">
+            <tr>
+              <td style="padding-right:16px">
+                <p style="color:rgba(255,255,255,0.55);font-size:11px;margin:0 0 2px;text-transform:uppercase;letter-spacing:1px">Venue</p>
+                <p style="color:#ffffff;font-size:13px;margin:0;font-weight:600">${venue}</p>
+              </td>
+              <td>
+                <p style="color:rgba(255,255,255,0.55);font-size:11px;margin:0 0 2px;text-transform:uppercase;letter-spacing:1px">Date</p>
+                <p style="color:#ffffff;font-size:13px;margin:0;font-weight:600">${eventDate}</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <!-- ══ GOLD STRIPE ══ -->
+      <tr><td style="background:#FEC700;height:6px;font-size:0;line-height:0">&nbsp;</td></tr>
+
+      <!-- ══ STATUS BANNER ══ -->
+      <tr>
+        <td style="background:${hasBalance ? '#fff8e1' : '#f0fdf4'};
+                   border-bottom:1px solid ${hasBalance ? '#ffc107' : '#bbf7d0'};
+                   padding:10px 32px;text-align:center">
+          <p style="margin:0;font-size:13px;font-weight:700;
+                     color:${hasBalance ? '#92400e' : '#166534'}">
+            ${hasBalance
+              ? `Outstanding Balance: ${fmtMoney(ticket.balance_due)} — Please pay at the registration desk`
+              : 'Payment Confirmed &mdash; Fully Paid'}
+          </p>
+        </td>
+      </tr>
+
+      <!-- ══ TICKET BODY — cream background ══ -->
+      <tr>
+        <td style="background:#FBF6E6;padding:28px 32px">
+
+          <!-- Attendee info grid -->
+          <table cellpadding="0" cellspacing="0" width="100%">
+            <tr>
+              <td style="padding:0 12px 16px 0;width:50%;vertical-align:top">
+                <p style="color:#888;font-size:10px;font-weight:700;text-transform:uppercase;
+                           letter-spacing:1.5px;margin:0 0 4px">Name</p>
+                <p style="color:#02462E;font-size:16px;font-weight:800;margin:0;line-height:1.3">
+                  ${ticket.participant_name}
+                </p>
+              </td>
+              <td style="padding:0 0 16px 0;width:50%;vertical-align:top">
+                <p style="color:#888;font-size:10px;font-weight:700;text-transform:uppercase;
+                           letter-spacing:1.5px;margin:0 0 4px">Ticket Type</p>
+                <p style="color:#333;font-size:14px;font-weight:600;margin:0">
+                  ${ticket.ticket_type_name || 'General'}
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 12px 16px 0;vertical-align:top">
+                <p style="color:#888;font-size:10px;font-weight:700;text-transform:uppercase;
+                           letter-spacing:1.5px;margin:0 0 4px">Amount Paid</p>
+                <p style="color:#02462E;font-size:16px;font-weight:800;margin:0">
+                  ${fmtMoney(ticket.amount_paid)}
+                </p>
+              </td>
+              <td style="padding:0 0 16px 0;vertical-align:top">
+                ${hasBalance ? `
+                <p style="color:#888;font-size:10px;font-weight:700;text-transform:uppercase;
+                           letter-spacing:1.5px;margin:0 0 4px">Balance Due</p>
+                <p style="color:#dc2626;font-size:16px;font-weight:800;margin:0">
+                  ${fmtMoney(ticket.balance_due)}
+                </p>` : `
+                <p style="color:#888;font-size:10px;font-weight:700;text-transform:uppercase;
+                           letter-spacing:1.5px;margin:0 0 4px">Payment Method</p>
+                <p style="color:#333;font-size:14px;font-weight:600;margin:0;text-transform:capitalize">
+                  ${(ticket.payment_method || 'paystack').replace('_', ' ')}
+                </p>`}
+              </td>
+            </tr>
+          </table>
+
+          <!-- Dashed divider -->
+          <table cellpadding="0" cellspacing="0" width="100%" style="margin:4px 0 20px">
+            <tr>
+              <td style="border-top:2px dashed #ddd;height:1px;font-size:0">&nbsp;</td>
+            </tr>
+          </table>
+
+          <!-- Ticket number — centred, large -->
+          <p style="text-align:center;color:#888;font-size:10px;font-weight:700;
+                     text-transform:uppercase;letter-spacing:2px;margin:0 0 8px">
             Ticket Number
           </p>
-          <p style="color:#fff;font-size:20px;font-weight:900;margin:0;font-family:monospace;letter-spacing:2px">
+          <p style="text-align:center;color:#02462E;font-size:26px;font-weight:900;
+                     letter-spacing:3px;margin:0 0 20px;font-family:'Courier New',monospace">
             ${ticket.unique_number}
           </p>
+
+          <!-- QR code — centred -->
+          ${qrDataUrl ? `
+          <table cellpadding="0" cellspacing="0" width="100%">
+            <tr>
+              <td align="center" style="padding:20px;background:#ffffff;
+                border:2px solid rgba(2,70,46,0.15)">
+                <img src="${qrDataUrl}"
+                  width="160" height="160"
+                  alt="Ticket QR Code: ${ticket.unique_number}"
+                  style="display:block;border:0" />
+                <p style="color:#999;font-size:11px;margin:10px 0 0">
+                  Scan or show at the event gate
+                </p>
+              </td>
+            </tr>
+          </table>` : `
+          <table cellpadding="0" cellspacing="0" width="100%">
+            <tr>
+              <td align="center" style="padding:20px;background:#f9f9f9;border:2px dashed #ddd">
+                <p style="color:#aaa;font-size:13px;margin:0">QR code available at check-in</p>
+                <p style="color:#02462E;font-size:15px;font-weight:700;margin:8px 0 0;
+                           font-family:'Courier New',monospace;letter-spacing:2px">
+                  ${ticket.unique_number}
+                </p>
+              </td>
+            </tr>
+          </table>`}
+
+          ${hasBalance ? `
+          <!-- Balance warning -->
+          <table cellpadding="0" cellspacing="0" width="100%" style="margin-top:20px">
+            <tr>
+              <td style="background:#fff8e1;border:1px solid #ffc107;
+                          padding:14px 18px;border-radius:4px">
+                <p style="color:#92400e;font-size:13px;font-weight:700;margin:0 0 6px">
+                  Outstanding Balance
+                </p>
+                <p style="color:#92400e;font-size:13px;margin:0;line-height:1.6">
+                  Please complete payment of <strong>${fmtMoney(ticket.balance_due)}</strong>
+                  at the registration desk upon arrival.
+                </p>
+              </td>
+            </tr>
+          </table>` : ''}
+
         </td>
-        <td style="padding:8px 0">
-          <p style="color:${B.gold};font-size:10px;font-weight:700;letter-spacing:2px;margin:0 0 4px;text-transform:uppercase">
-            Ticket Type
+      </tr>
+
+      <!-- ══ INSTRUCTIONS ══ -->
+      <tr>
+        <td style="background:#ffffff;padding:20px 32px;border-top:1px solid #f0f0f0">
+          <p style="color:#555;font-size:13px;font-weight:700;margin:0 0 8px">
+            Important Information
           </p>
-          <p style="color:#fff;font-size:15px;font-weight:700;margin:0">
-            ${ticket.ticket_type_name || 'General'}
+          <ul style="color:#666;font-size:13px;margin:0;padding-left:18px;line-height:2">
+            <li>Show your QR code or ticket number at the event gate</li>
+            <li>Arrive at least 30 minutes before sessions begin</li>
+            <li>Dress modestly in accordance with Islamic guidelines</li>
+            ${hasBalance ? `<li style="color:#92400e;font-weight:600">
+              Complete your outstanding payment of ${fmtMoney(ticket.balance_due)} at the registration desk
+            </li>` : ''}
+          </ul>
+        </td>
+      </tr>
+
+      <!-- ══ FOOTER ══ -->
+      <tr>
+        <td style="background:#02462E;padding:20px 32px;text-align:center">
+          <p style="color:rgba(255,255,255,0.6);font-size:12px;margin:0 0 4px">
+            Muslim Youth Summit &mdash; Lagos, Nigeria
+          </p>
+          <p style="color:rgba(255,255,255,0.4);font-size:11px;margin:0">
+            muslimyouthsummit.com &nbsp;&bull;&nbsp; ${edition}
           </p>
         </td>
       </tr>
-      <tr>
-        <td style="padding:8px 0">
-          <p style="color:${B.gold};font-size:10px;font-weight:700;letter-spacing:2px;margin:0 0 4px;text-transform:uppercase">
-            Event Date
-          </p>
-          <p style="color:#fff;font-size:14px;margin:0">${dateStr}</p>
-        </td>
-        <td style="padding:8px 0">
-          <p style="color:${B.gold};font-size:10px;font-weight:700;letter-spacing:2px;margin:0 0 4px;text-transform:uppercase">
-            Venue
-          </p>
-          <p style="color:#fff;font-size:14px;margin:0">${ticket.event_venue || ticket.venue || 'See event details'}</p>
-        </td>
-      </tr>
-      ${ticket.amount_paid ? `
-      <tr>
-        <td colspan="2" style="padding:8px 0;border-top:1px solid rgba(255,255,255,0.2)">
-          <p style="color:${B.gold};font-size:10px;font-weight:700;letter-spacing:2px;margin:0 0 4px;text-transform:uppercase">
-            Amount Paid
-          </p>
-          <p style="color:#fff;font-size:15px;font-weight:700;margin:0">
-            NGN ${Number(ticket.amount_paid).toLocaleString('en-NG')}
-            ${Number(ticket.balance_due) > 0
-              ? `<span style="color:#ffc107;font-size:13px;font-weight:400">
-                  (Balance due: NGN ${Number(ticket.balance_due).toLocaleString('en-NG')} — payable at gate)
-                </span>`
-              : ''}
-          </p>
-        </td>
-      </tr>` : ''}
+
     </table>
+    <!--  /OUTER CARD  -->
 
-    ${qrBlock}
-
-    <!-- Important info box -->
-    <div style="background:#fff8e1;border:1px solid #ffc107;border-radius:4px;padding:16px 20px;margin-bottom:24px">
-      <p style="color:#856404;font-size:13px;font-weight:700;margin:0 0 8px">Important</p>
-      <ul style="color:#856404;font-size:13px;margin:0;padding-left:18px;line-height:1.8">
-        <li>Show your QR code or ticket number <strong>${ticket.unique_number}</strong> at the gate</li>
-        <li>Arrive at least 30 minutes before the programme starts</li>
-        <li>Dress code: Modest Islamic attire</li>
-        ${Number(ticket.balance_due) > 0
-          ? `<li>Complete your balance payment of <strong>NGN ${Number(ticket.balance_due).toLocaleString('en-NG')}</strong> at the registration desk</li>`
-          : ''}
-      </ul>
-    </div>
-
-    <p style="color:#555;font-size:14px;margin:0;line-height:1.7">
-      We look forward to seeing you at the event. May Allah bless the gathering and make it a means of benefit.
+    <!-- View online link -->
+    <p style="text-align:center;margin:16px 0 0">
+      <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/ticket/${ticket.unique_number}"
+        style="color:#02462E;font-size:13px;text-decoration:none">
+        View ticket online &rarr;
+      </a>
     </p>
-    <p style="color:${B.green};font-size:14px;font-weight:700;margin:16px 0 0">
-      Jazakallahu Khayran &mdash; The MYS Team
-    </p>
-  `);
+
+  </td></tr>
+</table>
+</body>
+</html>`;
 
   return send({
     to:      ticket.participant_email,
-    subject: `Your MYS Ticket Confirmed: ${ticket.unique_number}`,
+    subject: `Ticket Confirmed: ${ticket.unique_number} — ${ticket.event_title}`,
     html,
   });
 };
