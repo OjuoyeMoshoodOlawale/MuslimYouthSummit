@@ -106,12 +106,33 @@ export const initiateTicketPurchase = async (req, res, next) => {
       }
     }
 
-    // Create pending ticket
-    await query(
-      `INSERT INTO tickets (participant_id, event_id, ticket_type_id, category_id, unique_number, paystack_reference, amount_paid, is_early_bird, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
-      [participantId, event_id, ticket_type_id, category_id || null, uniqueNumber, paystackRef, price, isEarlyBird ? 1 : 0]
+    // Check for an existing PENDING ticket for this participant+event and reuse it
+    // (prevents duplicate pending rows + Paystack "Duplicate Transaction Reference"
+    //  when a user closes the popup and clicks Pay again)
+    const [pendingExisting] = await query(
+      `SELECT id FROM tickets
+       WHERE participant_id = ? AND event_id = ? AND status = 'pending'
+       ORDER BY id DESC LIMIT 1`,
+      [participantId, event_id]
     );
+
+    if (pendingExisting.length) {
+      // Reuse the row but give it a FRESH reference (old one may be locked at Paystack)
+      await query(
+        `UPDATE tickets
+         SET ticket_type_id = ?, category_id = ?, paystack_reference = ?,
+             amount_paid = ?, is_early_bird = ?, unique_number = ?
+         WHERE id = ?`,
+        [ticket_type_id, category_id || null, paystackRef, price, isEarlyBird ? 1 : 0, uniqueNumber, pendingExisting[0].id]
+      );
+    } else {
+      // Create pending ticket
+      await query(
+        `INSERT INTO tickets (participant_id, event_id, ticket_type_id, category_id, unique_number, paystack_reference, amount_paid, is_early_bird, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+        [participantId, event_id, ticket_type_id, category_id || null, uniqueNumber, paystackRef, price, isEarlyBird ? 1 : 0]
+      );
+    }
 
     // Init Paystack
     const paystackData = await initializeTransaction({

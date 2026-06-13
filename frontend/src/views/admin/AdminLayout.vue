@@ -8,7 +8,7 @@
     <!-- Sidebar -->
     <aside class="fixed top-0 left-0 h-full z-50 transition-transform duration-300"
       :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'">
-      <AdminSidebar :collapsed="sidebarCollapsed" />
+      <AdminSidebar :collapsed="sidebarCollapsed" @toggle="sidebarCollapsed = !sidebarCollapsed" />
     </aside>
 
     <!-- Main content -->
