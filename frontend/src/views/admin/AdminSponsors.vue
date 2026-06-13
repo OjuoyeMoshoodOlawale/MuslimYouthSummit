@@ -136,8 +136,12 @@
         <label class="label">Logo URL <span class="text-gray-400 font-normal text-xs">(transparent PNG or SVG recommended)</span></label>
         <input v-model="form.logo_url" class="input" placeholder="https://… sponsor logo image" />
         <div v-if="form.logo_url" class="mt-2 h-16 w-40 border border-gray-100 bg-gray-50 flex items-center justify-center p-2 overflow-hidden">
-          <img :src="form.logo_url" class="max-w-full max-h-full object-contain" @error="form.logo_url=''" />
+          <img :src="form.logo_url" class="max-w-full max-h-full object-contain"
+            @error="logoError=true" @load="logoError=false" />
         </div>
+        <p v-if="logoError && form.logo_url" class="text-xs text-amber-600 mt-1">
+          Preview unavailable — the URL will still be saved. Double-check it's a direct image link.
+        </p>
       </div>
 
       <div>
@@ -203,6 +207,7 @@ const tiers = [
 ];
 const form = reactive({ event_id:null, name:'', logo_url:'', website_url:'', tier:'gold', description:'', sort_order:0, is_active:1 });
 const errs = reactive({ name:'' });
+const logoError = ref(false);
 
 const tierColor = (t) => tiers.find(x=>x.value===t)?.color || '#02462E';
 const countByTier = (t) => sponsors.value.filter(s=>s.tier===t).length;
@@ -227,8 +232,8 @@ onMounted(async () => {
 });
 
 const resetForm = () => { Object.assign(form,{event_id:null,name:'',logo_url:'',website_url:'',tier:'gold',description:'',sort_order:sponsors.value.length,is_active:1}); errs.name=''; editing.value=null; };
-const openCreate = () => { resetForm(); modal.value=true; };
-const openEdit = (sp) => { editing.value=sp.id; Object.assign(form,{event_id:sp.event_id||null,name:sp.name,logo_url:sp.logo_url||'',website_url:sp.website_url||'',tier:sp.tier,description:sp.description||'',sort_order:sp.sort_order,is_active:sp.is_active}); modal.value=true; };
+const openCreate = () => { resetForm(); logoError.value=false; modal.value=true; };
+const openEdit = (sp) => { editing.value=sp.id; Object.assign(form,{event_id:sp.event_id||null,name:sp.name,logo_url:sp.logo_url||'',website_url:sp.website_url||'',tier:sp.tier,description:sp.description||'',sort_order:sp.sort_order,is_active:sp.is_active}); logoError.value=false; modal.value=true; };
 const save = async () => {
   errs.name = form.name.trim()?'':'Name is required.';
   if (errs.name) return;
