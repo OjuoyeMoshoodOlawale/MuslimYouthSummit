@@ -231,11 +231,13 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { useRoute } from 'vue-router';
 import { QrCode, Tag, Users, BedDouble, Search, CheckCircle2, XCircle, Ticket, LogOut, X, LayoutGrid } from 'lucide-vue-next';
 import QrScanner from '@/components/admin/QrScanner.vue';
 import { useEventStore } from '@/stores/eventStore.js';
 import api from '@/composables/useApi.js';
 
+const route            = useRoute();
 const eventStore       = useEventStore();
 const showScanner      = ref(false);
 const ticketPlaceholder = computed(() => {
@@ -284,6 +286,15 @@ onMounted(async () => {
     categories.value = (catRes.data.data||[]).filter(c=>c.is_active);
     hostels.value    = hosRes.data.data||[];
   } catch {}
+
+  // If a tag/ticket QR was scanned with a phone camera, it opens
+  // /check-in?tag=TAG-001 — auto-look it up immediately.
+  const q = route.query;
+  const scanned = q.tag || q.ref || q.reference || q.ticket;
+  if (scanned) lookup(String(scanned));
+
+  // Focus input for immediate typing
+  nextTick(() => { inputEl.value?.focus(); });
 });
 onUnmounted(()=>clearInterval(refreshTimer));
 
