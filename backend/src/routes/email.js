@@ -1,4 +1,5 @@
 import express from 'express';
+import { sendTestEmail } from '../services/emailService.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { query } from '../database/db.js';
 import { success, created, error } from '../utils/response.js';
@@ -8,6 +9,23 @@ const router = express.Router();
 const adm = [authenticate, authorize('super_admin', 'admin')];
 
 /* ── List campaigns ──────────────────────────────────────────── */
+
+/* ── Test email (admin only) ──────────────────────────────── */
+router.post('/email/test', authenticate, authorize('super_admin','admin'), async (req, res, next) => {
+  try {
+    const to = req.body.email || req.admin.email;
+    await sendTestEmail(to);
+    success(res, { sent_to: to }, `Test email sent to ${to} — check your inbox (and spam folder).`);
+  } catch (err) {
+    // Return the actual SMTP error so admin can diagnose
+    return res.status(500).json({
+      success: false,
+      message: `Email failed: ${err.message}`,
+      hint: 'Check SMTP_HOST, SMTP_USER, SMTP_PASS in backend/.env and make sure you used a Gmail App Password.',
+    });
+  }
+});
+
 router.get('/campaigns', ...adm, async (req, res, next) => {
   try {
     const [rows] = await query(

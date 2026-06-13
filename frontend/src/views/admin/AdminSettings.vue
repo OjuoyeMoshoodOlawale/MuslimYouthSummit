@@ -111,6 +111,47 @@
       </button>
     </div>
 
+    <!-- Email Configuration -->
+    <div class="bg-white border border-gray-100 p-6 space-y-4">
+      <h3 class="font-display font-bold text-brand-green border-b border-gray-100 pb-3 flex items-center gap-2">
+        <Mail :size="16" /> Email (SMTP)
+      </h3>
+      <div v-if="!emailConfigured" class="bg-yellow-50 border border-yellow-100 p-4">
+        <p class="font-semibold text-yellow-800 text-sm flex items-center gap-2">
+          <AlertTriangle :size="14" /> Email not configured
+        </p>
+        <p class="text-xs text-yellow-700 mt-1">
+          Add <code class="bg-yellow-100 px-1">SMTP_HOST</code>, <code class="bg-yellow-100 px-1">SMTP_USER</code>,
+          <code class="bg-yellow-100 px-1">SMTP_PASS</code> to <code class="bg-yellow-100 px-1">backend/.env</code>
+        </p>
+      </div>
+      <div v-else class="space-y-3">
+        <div class="flex items-center gap-3 bg-green-50 border border-green-100 p-3">
+          <CheckCircle2 :size="16" class="text-green-600 flex-shrink-0" />
+          <div>
+            <p class="font-semibold text-green-800 text-sm">SMTP configured</p>
+            <p class="text-xs text-green-700">Host: {{ smtpHost }} · User: {{ smtpUser }}</p>
+          </div>
+        </div>
+        <div class="flex gap-3 items-end">
+          <div class="flex-1">
+            <label class="label">Send test email to</label>
+            <input v-model="testEmailTo" type="email" class="input text-sm" :placeholder="auth.admin?.email || 'you@gmail.com'" />
+          </div>
+          <button class="btn-green text-xs px-4 py-2.5 flex-shrink-0 flex items-center gap-1.5"
+            :disabled="testEmailBusy" @click="sendTestEmail">
+            <component :is="testEmailBusy ? Loader : Send" :size="13" :class="testEmailBusy?'animate-spin':''" />
+            {{ testEmailBusy ? 'Sending…' : 'Send Test' }}
+          </button>
+        </div>
+        <div v-if="testEmailResult" class="text-sm px-3 py-2 flex items-center gap-2"
+          :class="testEmailResult.ok ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'">
+          <component :is="testEmailResult.ok ? CheckCircle2 : XCircle" :size="14" class="flex-shrink-0" />
+          {{ testEmailResult.message }}
+        </div>
+      </div>
+    </div>
+
     <!-- SMS Configuration -->
     <div class="bg-white border border-gray-100 p-6 space-y-4">
       <h3 class="font-display font-bold text-brand-green border-b border-gray-100 pb-3 flex items-center gap-2">
@@ -155,7 +196,7 @@ TERMII_CHANNEL=generic</pre>
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { User, Lock, Save, Loader, Settings2, AlertTriangle, LogOut, MessageSquare, CheckCircle2 } from 'lucide-vue-next';
+import { User, Lock, Save, Loader, Settings2, AlertTriangle, LogOut, MessageSquare, CheckCircle2, Mail, Send, XCircle } from 'lucide-vue-next';
 import { useAuthStore }  from '@/stores/authStore.js';
 import { useAlertStore } from '@/stores/alertStore.js';
 import api from '@/composables/useApi.js';
@@ -170,7 +211,15 @@ const savingProfile = ref(false);
 const pwForm  = reactive({ current:'', new_pass:'', confirm:'' });
 const pwErrs  = reactive({ current:'', new_pass:'', confirm:'' });
 const savingPw = ref(false);
-const smsStatus = ref(null);
+const smsStatus      = ref(null);
+const testEmailTo    = ref('');
+const testEmailBusy  = ref(false);
+const testEmailResult= ref(null);
+
+// Read SMTP config from server env hint (safe — no passwords)
+const emailConfigured = computed(() => !!import.meta.env.VITE_EMAIL_CONFIGURED || false);
+const smtpHost = computed(() => import.meta.env.VITE_SMTP_HOST || '');
+const smtpUser = computed(() => import.meta.env.VITE_SMTP_USER || '');
 
 const prefs = reactive({
   email_notifications: true,
@@ -225,6 +274,19 @@ const changePassword = async () => {
 const savePrefs = () => {
   localStorage.setItem('mys_prefs', JSON.stringify(prefs));
   alert.success('Preferences saved.');
+};
+
+const sendTestEmail = async () => {
+  const to = testEmailTo.value.trim() || auth.admin?.email;
+  if (!to) { testEmailResult.value = { ok: false, message: 'Enter an email address.' }; return; }
+  testEmailBusy.value   = true;
+  testEmailResult.value = null;
+  try {
+    const { data } = await api.post('/email/test', { email: to });
+    testEmailResult.value = { ok: true, message: data.message || `Test email sent to ${to}. Check your inbox (and spam).` };
+  } catch (err) {
+    testEmailResult.value = { ok: false, message: err.response?.data?.message || 'Email failed. Check your SMTP settings.' };
+  } finally { testEmailBusy.value = false; }
 };
 
 const logout = () => { auth.logout(); router.push('/admin/login'); };
