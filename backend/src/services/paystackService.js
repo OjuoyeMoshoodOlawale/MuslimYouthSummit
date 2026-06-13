@@ -84,6 +84,15 @@ export const verifyTransaction = async (reference) => {
     if (err.response?.status === 401) {
       throw new Error('Invalid Paystack secret key. Check your PAYSTACK_SECRET_KEY in backend/.env.');
     }
+    if (err.code === 'ENOTFOUND' || err.code === 'EAI_AGAIN') {
+      throw new Error('Cannot reach Paystack (api.paystack.co). Check the server\'s internet connection / DNS.');
+    }
+    if (err.code === 'ECONNABORTED') {
+      throw new Error('Paystack verification timed out. Please try again.');
+    }
+    if (err.response?.data?.message) {
+      throw new Error(`Paystack: ${err.response.data.message}`);
+    }
     throw err;
   }
 };

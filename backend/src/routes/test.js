@@ -119,4 +119,56 @@ router.post('/test/resend-ticket', ...adm, async (req, res) => {
   }
 });
 
+/* ── Diagnose Paystack connection ───────────────────────── */
+router.get('/test/paystack', ...adm, async (req, res) => {
+  const key = process.env.PAYSTACK_SECRET_KEY;
+  const result = {
+    secret_key_set:   !!key,
+    secret_key_valid: !!key && /^sk_(test|live)_[A-Za-z0-9]+$/.test(key) && !/x{8,}/i.test(key),
+    public_key_set:   !!process.env.PAYSTACK_PUBLIC_KEY,
+    callback_url:     process.env.PAYMENT_CALLBACK_URL || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/ticket/verify`,
+  };
+
+  if (!result.secret_key_valid) {
+    return res.status(400).json({
+      success: false,
+      message: 'PAYSTACK_SECRET_KEY missing or is a placeholder. Set a real sk_test_... key in backend/.env',
+      diagnostics: result,
+    });
+  }
+
+  // Try reaching Paystack
+  try {
+    const axios = (await import('axios')).default;
+    const { data } = await axios.get('https://api.paystack.co/bank', {
+      headers: { Authorization: `Bearer ${key}` },
+      timeout: 10000,
+    });
+    result.paystack_reachable = true;
+    result.paystack_auth_ok   = !!data.status;
+    return res.json({
+      success: true,
+      message: 'Paystack connection OK. Payments should work.',
+      diagnostics: result,
+    });
+  } catch (err) {
+    result.paystack_reachable = !(err.code === 'ENOTFOUND' || err.code === 'EAI_AGAIN');
+    let hint = '';
+    if (err.code === 'ENOTFOUND' || err.code === 'EAI_AGAIN') {
+      hint = 'Server cannot resolve api.paystack.co — this is a network/DNS problem on your server, not a code issue. Check internet connection, firewall, or DNS.';
+    } else if (err.response?.status === 401) {
+      hint = 'Paystack rejected your secret key (401). Double-check PAYSTACK_SECRET_KEY.';
+    } else {
+      hint = err.message;
+    }
+    return res.status(502).json({
+      success: false,
+      message: 'Could not reach Paystack.',
+      hint,
+      error_code: err.code || err.response?.status,
+      diagnostics: result,
+    });
+  }
+});
+
 export default router;
