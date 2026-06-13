@@ -125,7 +125,6 @@ const routes = [
         meta: { roles: ADMIN_ONLY } },
       { path: 'media',               name: 'admin-media',           component: AdminMediaUpload,
         meta: { roles: ALL_ADMIN } },
-        meta: { roles: ADMIN_ONLY } },
     ],
   },
 
