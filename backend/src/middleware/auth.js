@@ -9,11 +9,18 @@ import { AppError } from './errorHandler.js';
 export const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    let token = null;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    } else if (req.query.token) {
+      // Allow token via query param for links opened directly in the browser
+      // (e.g. tag print pages, certificate downloads opened in a new tab)
+      token = req.query.token;
+    }
+    if (!token) {
       return unauthorized(res, 'Authentication required. Please log in.');
     }
 
-    const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     const [rows] = await query(

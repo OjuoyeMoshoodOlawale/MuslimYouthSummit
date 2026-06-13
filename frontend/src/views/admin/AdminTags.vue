@@ -161,10 +161,12 @@ import { Plus, Loader, Search, Tag, Printer } from 'lucide-vue-next';
 import AppModal from '@/components/common/AppModal.vue';
 import { useAlertStore } from '@/stores/alertStore.js';
 import { useEventStore } from '@/stores/eventStore.js';
+import { useAuthStore } from '@/stores/authStore.js';
 import api from '@/composables/useApi.js';
 
 const alert      = useAlertStore();
 const eventStore = useEventStore();
+const auth       = useAuthStore();
 
 const events       = ref([]);
 const tags         = ref([]);
@@ -235,8 +237,10 @@ const printSelected = () => openPrint(selectedIds.value.length ? selectedIds.val
 
 const openPrint = (ids) => {
   if (!selectedEvent.value) { alert.error('Select an event first.'); return; }
-  const params = ids?.length ? `ids=${ids.join(',')}` : `limit=40`;
-  window.open(`/api/events/${selectedEvent.value}/tags/print?${params}`, '_blank');
+  const token = auth.token || localStorage.getItem('mys_token') || '';
+  const parts = [ ids?.length ? `ids=${ids.join(',')}` : `limit=40` ];
+  if (token) parts.push(`token=${encodeURIComponent(token)}`);
+  window.open(`/api/events/${selectedEvent.value}/tags/print?${parts.join('&')}`, '_blank');
 };
 
 const toggleAll = (e) => {

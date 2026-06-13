@@ -404,23 +404,27 @@ const load = async () => {
     const { data } = await api.get('/participants', { params });
     rows.value       = data.data       || [];
     pagination.value = data.pagination || {};
+  } catch (e) {
+    console.error('Load participants error:', e);
+    rows.value = [];
+  } finally {
+    loading.value = false;
+  }
 
-    // Load summary stats if an event is selected
-    if (filters.event_id) {
+  // Stats + hostels are loaded separately — a failure here must NOT blank the list
+  if (filters.event_id) {
+    try {
       const { data: s } = await api.get(`/tickets/admin/stats/${filters.event_id}`);
       summaryStats.value = {
         checked_in: s.data?.checked_in || 0,
         partial:    s.data?.partial_payments || 0,
         revenue:    s.data?.total_revenue || 0,
       };
-      // Load hostel availability
+    } catch (e) { console.error('Stats load error:', e); }
+    try {
       const { data: h } = await api.get(`/hostels/event/${filters.event_id}/availability`);
       availableHostels.value = (h.data || []).filter(h => h.remaining > 0);
-    }
-  } catch (e) {
-    console.error('Load participants error:', e);
-  } finally {
-    loading.value = false;
+    } catch (e) { console.error('Hostel load error:', e); }
   }
 };
 
