@@ -36,6 +36,11 @@
 
       <!-- Certificate display -->
       <div v-else>
+        <div v-if="certificate.preview"
+          class="bg-amber-50 border border-amber-300 text-amber-800 text-sm px-4 py-2.5 mb-4 flex items-center gap-2 no-print">
+          <AlertCircle :size="15" />
+          Admin preview — this event hasn't concluded yet. Participants can't access this until it's completed.
+        </div>
         <div id="certificate" class="bg-white shadow-2xl border-8 border-brand-green relative overflow-hidden"
           style="aspect-ratio: 1.414/1">
           <!-- Decorative corners -->
