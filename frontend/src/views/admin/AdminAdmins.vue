@@ -27,9 +27,11 @@
       </template>
       <template #cell-created_at="{ row }">{{ fmt(row.created_at) }}</template>
       <template #actions="{ row }">
-        <div class="flex gap-2">
-          <button class="text-xs text-brand-green underline font-semibold"
+        <div class="flex gap-3">
+          <button class="text-xs text-brand-green underline font-semibold" @click="openEdit(row)">Edit</button>
+          <button class="text-xs text-gray-500 underline font-semibold"
             @click="toggleActive(row)">{{ row.is_active ? 'Deactivate' : 'Activate' }}</button>
+          <button class="text-xs text-red-500 underline font-semibold" @click="promptDelete(row)">Delete</button>
         </div>
       </template>
     </DataTable>
@@ -65,6 +67,49 @@
         <button type="button" class="btn-ghost text-xs" @click="createModal = false">Cancel</button>
       </div>
     </form>
+  </AppModal>
+
+  <AppModal v-model="editModal" title="Edit Admin" size="md">
+    <form class="space-y-4" @submit.prevent="saveEdit">
+      <div><label class="label">Full Name *</label><input v-model="editForm.name" class="input" /></div>
+      <div><label class="label">Email *</label><input v-model="editForm.email" type="email" class="input" /></div>
+      <div>
+        <label class="label">Role *</label>
+        <select v-model="editForm.role" class="input">
+          <option value="admin">Admin</option>
+          <option value="attendant">Attendant (check-in only)</option>
+          <option value="department">Department Staff (expense requests)</option>
+          <option value="super_admin">Super Admin</option>
+        </select>
+      </div>
+      <div v-if="editForm.role === 'department'">
+        <label class="label">Department *</label>
+        <select v-model="editForm.department_id" class="input">
+          <option value="">Select department…</option>
+          <option v-for="d in departments" :key="d.id" :value="d.id">{{ d.name }}</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">New Password <span class="text-gray-400 font-normal">(leave blank to keep current)</span></label>
+        <input v-model="editForm.password" type="password" class="input" placeholder="Min 8 characters" />
+      </div>
+      <div class="flex gap-2 pt-2">
+        <button type="submit" :disabled="editSaving" class="btn-green text-xs">{{ editSaving ? 'Saving…' : 'Save Changes' }}</button>
+        <button type="button" class="btn-ghost text-xs" @click="editModal = false">Cancel</button>
+      </div>
+    </form>
+  </AppModal>
+
+  <AppModal v-model="deleteModal" title="Delete Admin" size="sm">
+    <div class="space-y-4">
+      <p class="text-sm text-gray-600">
+        Remove <strong>{{ deleting?.name }}</strong> ({{ deleting?.email }})? This cannot be undone.
+      </p>
+      <div class="flex gap-2">
+        <button :disabled="deleteBusy" class="bg-red-600 text-white text-xs px-4 py-2 rounded hover:bg-red-700 transition-colors font-semibold" @click="doDelete">{{ deleteBusy ? 'Removing…' : 'Yes, Delete' }}</button>
+        <button class="btn-ghost text-xs" @click="deleteModal = false">Cancel</button>
+      </div>
+    </div>
   </AppModal>
 </template>
 
@@ -125,5 +170,48 @@ const toggleActive = async (row) => {
     await api.patch(`/auth/admins/${row.id}/status`, { is_active: !row.is_active });
     alert.success(`Admin ${row.is_active ? 'deactivated' : 'activated'}.`); load();
   } catch { alert.error('Failed.'); }
+};
+
+/* ── Edit ─────────────────────────────────────────── */
+const editModal  = ref(false);
+const editSaving = ref(false);
+const editForm   = reactive({ id:null, name:'', email:'', role:'admin', password:'', department_id:'' });
+
+const openEdit = (row) => {
+  Object.assign(editForm, {
+    id: row.id, name: row.name, email: row.email, role: row.role,
+    password: '', department_id: row.department_id || '',
+  });
+  editModal.value = true;
+};
+
+const saveEdit = async () => {
+  editSaving.value = true;
+  try {
+    const payload = {
+      name: editForm.name, email: editForm.email, role: editForm.role,
+      department_id: editForm.role === 'department' ? (editForm.department_id || null) : null,
+    };
+    if (editForm.password) payload.password = editForm.password;
+    await api.put(`/auth/admins/${editForm.id}`, payload);
+    alert.success('Admin updated.'); editModal.value = false; load();
+  } catch (err) { alert.error(err.response?.data?.message || 'Failed to update.'); }
+  finally { editSaving.value = false; }
+};
+
+/* ── Delete ───────────────────────────────────────── */
+const deleteModal = ref(false);
+const deleteBusy  = ref(false);
+const deleting    = ref(null);
+
+const promptDelete = (row) => { deleting.value = row; deleteModal.value = true; };
+
+const doDelete = async () => {
+  deleteBusy.value = true;
+  try {
+    await api.delete(`/auth/admins/${deleting.value.id}`);
+    alert.success('Admin removed.'); deleteModal.value = false; load();
+  } catch (err) { alert.error(err.response?.data?.message || 'Failed to delete.'); }
+  finally { deleteBusy.value = false; }
 };
 </script>

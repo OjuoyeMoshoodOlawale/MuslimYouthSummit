@@ -101,15 +101,26 @@ export const listAdmins = async (req, res, next) => {
 export const updateAdmin = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, email, role, is_active, department_id } = req.body;
+    const { name, email, role, is_active, department_id, password } = req.body;
 
-    const [existing] = await query('SELECT id FROM admins WHERE id = ?', [id]);
+    const [existing] = await query('SELECT id, is_active FROM admins WHERE id = ?', [id]);
     if (!existing.length) return notFound(res, 'Admin');
 
-    await query(
-      'UPDATE admins SET name=?, email=?, role=?, is_active=?, department_id=? WHERE id=?',
-      [name, email?.toLowerCase(), role, is_active ? 1 : 0, department_id || null, id]
-    );
+    // Preserve current is_active if not explicitly provided
+    const activeVal = is_active === undefined ? existing[0].is_active : (is_active ? 1 : 0);
+
+    if (password && password.length >= 8) {
+      const hash = await bcrypt.hash(password, 12);
+      await query(
+        'UPDATE admins SET name=?, email=?, role=?, is_active=?, department_id=?, password=? WHERE id=?',
+        [name, email?.toLowerCase(), role, activeVal, department_id || null, hash, id]
+      );
+    } else {
+      await query(
+        'UPDATE admins SET name=?, email=?, role=?, is_active=?, department_id=? WHERE id=?',
+        [name, email?.toLowerCase(), role, activeVal, department_id || null, id]
+      );
+    }
     return success(res, null, 'Admin updated.');
   } catch (e) { next(e); }
 };
