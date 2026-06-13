@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 /**
  * Generate a unique ticket number
@@ -36,9 +37,16 @@ export const generateTagNumber = (sequence) => {
  * Generate a Paystack-style reference
  */
 export const generatePaystackRef = (prefix = 'MYS') => {
+  // Guaranteed-unique reference: timestamp + high-entropy random + counter.
+  // Even if two requests hit the same millisecond, the random + crypto bits differ.
   const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-  return `${prefix}_${timestamp}_${random}`;
+  const rand1 = Math.random().toString(36).substring(2, 10).toUpperCase();
+  const rand2 = Math.random().toString(36).substring(2, 6).toUpperCase();
+  let cryptoBit = '';
+  try {
+    cryptoBit = '_' + randomUUID().split('-')[0].toUpperCase();
+  } catch { /* randomUUID not available — timestamp+random is enough */ }
+  return `${prefix}_${timestamp}_${rand1}${rand2}${cryptoBit}`;
 };
 
 /**

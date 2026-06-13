@@ -321,40 +321,44 @@ const pay = async () => {
   processing.value  = true;
 
   try {
-    // 1. Initiate ticket on backend → get authorization_url + access_code
+    // 1. Initiate on backend → server creates the Paystack transaction (using the
+    //    secret key) and returns authorization_url + access_code + reference.
     const { data } = await api.post('/tickets/initiate', {
       ...form,
       event_id:       eventStore.activeEvent.id,
       ticket_type_id: form.ticket_type_id,
     });
-
     const authData = data.data;
 
-    // 2. Try Paystack popup first, fall back to full-page redirect
-    try {
-      await openPaystackPopup(authData);
-      // Popup payment succeeded — verify with backend then show ticket
-      processing.value = true;
-      try {
-        await api.get(`/tickets/verify/${authData.reference}`);
-      } catch {} // Verification errors are handled on the ticket page
-      router.push(`/ticket/verify?reference=${authData.reference}`);
-      return;
-    } catch (popupErr) {
-      if (popupErr.message === 'CLOSED') {
-        serverError.value = 'Payment window closed. Your ticket is reserved for 30 minutes. Click Pay to try again.';
-        processing.value = false;
-        return;
-      }
-      // NO_KEY or SCRIPT_FAILED — fall through to full-page redirect
-    }
-
-    // 3. Full-page redirect to Paystack (fallback)
+    // 2. PRIMARY: redirect to Paystack's hosted checkout via authorization_url.
+    //    This is the most reliable path — it needs no public key in the browser,
+    //    never throws "Please enter a valid Key", and handles all card types.
+    //    Paystack will redirect back to our callback (/ticket/verify) after payment.
     if (authData.authorization_url) {
       window.location.href = authData.authorization_url;
-    } else {
-      throw new Error('No payment URL received from server.');
+      return;
     }
+
+    // 3. FALLBACK: inline popup (only if we somehow have no authorization_url
+    //    but do have a usable public key + access_code).
+    const publicKey = authData.public_key || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
+    if (authData.access_code && publicKey) {
+      try {
+        await openPaystackPopup(authData);
+        processing.value = true;
+        try { await api.get(`/tickets/verify/${authData.reference}`); } catch {}
+        router.push(`/ticket/verify?reference=${authData.reference}`);
+        return;
+      } catch (popupErr) {
+        if (popupErr.message === 'CLOSED') {
+          serverError.value = 'Payment window closed. Your ticket is reserved — click Pay to try again.';
+          processing.value = false;
+          return;
+        }
+      }
+    }
+
+    throw new Error('Could not start the payment. Please try again or contact support.');
   } catch (err) {
     serverError.value = err.response?.data?.message || err.message || 'Payment initiation failed. Please try again.';
     processing.value = false;
