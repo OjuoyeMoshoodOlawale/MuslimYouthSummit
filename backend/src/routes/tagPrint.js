@@ -21,6 +21,7 @@ router.get('/events/:eventId/tags/print', authenticate, async (req, res, next) =
   try {
     const { eventId } = req.params;
     const { ids, unassigned, limit = 40 } = req.query;
+    const BASE_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
     // Get event info
     const [[event]] = await query('SELECT * FROM events WHERE id=?', [eventId]);
@@ -70,52 +71,37 @@ router.get('/events/:eventId/tags/print', authenticate, async (req, res, next) =
     const tagIds = tags.map(t => t.id);
     await query(`UPDATE event_tags SET is_printed=1 WHERE id IN (${tagIds.map(()=>'?').join(',')})`, tagIds);
 
-    // Build badge HTML for each tag
+    // Build badge HTML — BLANK tag: logo + tag number + QR only.
+    // Tags are printed BEFORE the event and assigned to people at registry on the day.
     const buildBadge = (tag, event) => {
-      const catColor  = tag.category_color  || '#02462E';
-      const catName   = tag.category_name   || 'General';
-      const pName     = tag.participant_name || '—';
-      const tagNum    = tag.tag_number       || '???';
-      const ticketNum = tag.ticket_number    || '';
+      const tagNum = tag.tag_number || '???';
+      const qr = tag.qr_code_svg
+        ? tag.qr_code_svg.replace('<svg', '<svg width="150" height="150"')
+        : buildFallbackQR(tagNum);
 
       return `
       <div class="badge">
-        <!-- Top bar with event branding -->
-        <div class="badge-header" style="background:${catColor}">
-          <span class="badge-event-name">${event.edition || 'MYS'}</span>
-          <span class="badge-event-title">${event.title}</span>
+        <!-- Brand header -->
+        <div class="badge-header">
+          <img src="${BASE_URL}/logos/logo-white.png" class="badge-logo" alt="MYS" />
+          <div class="badge-edition">${event.edition || 'MYS'}</div>
+          <div class="badge-event-title">${event.title || 'Muslim Youth Summit'}</div>
         </div>
 
-        <!-- Main content -->
+        <!-- Gold divider -->
+        <div class="badge-stripe"></div>
+
+        <!-- Body: tag number + QR -->
         <div class="badge-body">
-          <div class="badge-left">
-            <!-- Participant name -->
-            <div class="badge-name">${pName}</div>
-
-            <!-- Category pill -->
-            <div class="badge-category" style="background:${catColor}22;color:${catColor};border:1.5px solid ${catColor}">
-              ${catName}
-            </div>
-
-            <!-- Tag number (large, unique) -->
-            <div class="badge-tag-num">${tagNum}</div>
-
-            <!-- Ticket ref -->
-            ${ticketNum ? `<div class="badge-ticket-ref">${ticketNum}</div>` : ''}
-          </div>
-
-          <!-- QR Code -->
-          <div class="badge-qr">
-            ${tag.qr_code_svg
-              ? tag.qr_code_svg.replace('<svg', '<svg width="100" height="100"')
-              : buildFallbackQR(tagNum)
-            }
-          </div>
+          <div class="badge-label">Tag Number</div>
+          <div class="badge-tag-num">${tagNum}</div>
+          <div class="badge-qr">${qr}</div>
+          <div class="badge-scan">Scan at gate to check in</div>
         </div>
 
         <!-- Footer -->
-        <div class="badge-footer" style="background:${catColor}11;border-top:2px solid ${catColor}33">
-          <span>Scan to verify • ${event.venue || 'Muslim Youth Summit'}</span>
+        <div class="badge-footer">
+          <span>${event.venue || 'Muslim Youth Summit'}</span>
         </div>
       </div>`;
     };
@@ -231,92 +217,99 @@ router.get('/events/:eventId/tags/print', authenticate, async (req, res, next) =
     }
 
     .badge-header {
-      padding: 6px 10px;
+      background: #02462E;
+      padding: 14px 10px 10px;
       display: flex;
       flex-direction: column;
-      line-height: 1.2;
+      align-items: center;
+      text-align: center;
     }
 
-    .badge-event-name {
-      font-size: 22px;
+    .badge-logo {
+      height: 34px;
+      width: auto;
+      margin-bottom: 8px;
+    }
+
+    .badge-edition {
+      font-size: 26px;
       font-weight: 900;
-      letter-spacing: 0.05em;
-      color: white;
-      text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      letter-spacing: 0.08em;
+      color: #FEC700;
+      line-height: 1;
     }
 
     .badge-event-title {
       font-size: 8px;
-      color: rgba(255,255,255,0.85);
-      letter-spacing: 0.05em;
+      color: rgba(255,255,255,0.75);
+      letter-spacing: 0.12em;
       text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    .badge-stripe {
+      height: 5px;
+      background: #FEC700;
     }
 
     .badge-body {
       flex: 1;
       display: flex;
-      gap: 0;
-      padding: 8px 10px;
-      align-items: flex-start;
-    }
-
-    .badge-left {
-      flex: 1;
-      display: flex;
       flex-direction: column;
-      gap: 5px;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 10px;
+      gap: 8px;
+      background: #FBF6E6;
     }
 
-    .badge-name {
-      font-size: 15px;
-      font-weight: 700;
-      color: #1a1a1a;
-      line-height: 1.2;
-      word-break: break-word;
-    }
-
-    .badge-category {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 20px;
-      font-size: 9px;
+    .badge-label {
+      font-size: 8px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.1em;
-      width: fit-content;
+      letter-spacing: 0.25em;
+      color: #999;
     }
 
     .badge-tag-num {
-      font-size: 28px;
+      font-size: 34px;
       font-weight: 900;
       color: #02462E;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.06em;
       line-height: 1;
-      margin-top: 4px;
-    }
-
-    .badge-ticket-ref {
-      font-size: 7.5px;
-      color: #888;
-      font-family: monospace;
-      letter-spacing: 0.05em;
+      font-family: 'Courier New', monospace;
     }
 
     .badge-qr {
-      flex-shrink: 0;
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       justify-content: center;
+      background: white;
+      padding: 8px;
+      border: 2px solid rgba(2,70,46,0.12);
+      border-radius: 4px;
+      margin-top: 4px;
     }
 
     .badge-qr svg { display: block; }
 
+    .badge-scan {
+      font-size: 8px;
+      color: #02462E;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
     .badge-footer {
-      padding: 4px 10px;
+      background: #02462E;
+      padding: 6px 10px;
       font-size: 7px;
-      color: #888;
+      color: rgba(255,255,255,0.6);
       text-align: center;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
 
     /* ── CUT LINES ─────────────────────────────── */
