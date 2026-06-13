@@ -133,6 +133,7 @@ const pageTitles = {
   'admin-expenses':        'Expense Requests',
   'admin-souvenirs':       'Souvenirs & Merchandise',
   'admin-sponsors':        'Sponsors & Partners',
+  'admin-media':           'Upload Recordings',
   'admin-admins':          'Admin Users',
   'admin-settings':        'My Settings',
 };

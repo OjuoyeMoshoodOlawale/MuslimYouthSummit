@@ -408,8 +408,9 @@ import api from '@/composables/useApi.js';
 const routerRef = useRouter();
 const routeRef  = useRoute();
 const router = routerRef;
-// Get event id from route params (works with or without props:true in router)
-const props  = { id: routeRef.params.id };
+// Get event id from route params — accessible in template as 'id'
+const id    = routeRef.params.id;
+const props = { id };
 const alert  = useAlertStore();
 
 const event   = ref(null);
