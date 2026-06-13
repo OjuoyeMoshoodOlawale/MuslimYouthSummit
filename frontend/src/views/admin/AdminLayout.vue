@@ -91,7 +91,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { Menu, PanelLeft, ChevronDown, ReceiptText, Settings, LogOut, ExternalLink } from 'lucide-vue-next';
 import AdminSidebar from '@/components/admin/AdminSidebar.vue';
@@ -101,7 +101,7 @@ import api from '@/composables/useApi.js';
 
 const auth   = useAuthStore();
 const alert  = useAlertStore();
-const route  = useRouter();
+const route  = useRoute();
 const router = useRouter();
 
 const sidebarOpen      = ref(false);
@@ -109,6 +109,9 @@ const sidebarCollapsed = ref(false);
 const userMenuOpen     = ref(false);
 const userMenuRef      = ref(null);
 const pendingExpenses  = ref(0);
+
+// Auto-close the mobile sidebar whenever the route changes (after tapping a link)
+watch(() => route.fullPath, () => { sidebarOpen.value = false; userMenuOpen.value = false; });
 
 const isAdmin = computed(() => ['super_admin','admin'].includes(auth.admin?.role));
 
