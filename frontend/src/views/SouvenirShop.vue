@@ -130,9 +130,25 @@
               <AlertCircle :size="14" class="flex-shrink-0 mt-0.5" />{{ buyErr }}
             </p>
 
+            <!-- Fee breakdown -->
+            <div class="bg-brand-cream border border-brand-gold/30 p-3 space-y-1.5 text-sm">
+              <div class="flex justify-between">
+                <span class="text-gray-600">Item total</span>
+                <span class="font-semibold">₦{{ fmtP(buyFees.subtotal) }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600">Processing fee <span class="text-xs text-gray-400">(Paystack)</span></span>
+                <span class="font-semibold text-gray-600">₦{{ fmtP(buyFees.fee) }}</span>
+              </div>
+              <div class="flex justify-between pt-1.5 border-t border-brand-gold/20">
+                <span class="font-bold text-brand-green">Total to pay</span>
+                <span class="font-display font-bold text-brand-green">₦{{ fmtP(buyFees.total) }}</span>
+              </div>
+            </div>
+
             <button type="submit" :disabled="buyBusy" class="btn-gold w-full justify-center py-3.5 text-base">
               <component :is="buyBusy ? Loader : CreditCard" :size="16" :class="buyBusy?'animate-spin':''" />
-              {{ buyBusy ? 'Processing…' : `Pay ₦${fmtP((buying?.price||0)*buyQty)} with Paystack` }}
+              {{ buyBusy ? 'Processing…' : `Pay ₦${fmtP(buyFees.total)} with Paystack` }}
             </button>
             <p class="text-center text-xs text-gray-400 flex items-center justify-center gap-1.5">
               <ShieldCheck :size="13" class="text-green-500" />
@@ -212,6 +228,7 @@ import {
   ArrowLeft, ShoppingCart, ShoppingBag, Package, X, CreditCard,
   Loader, ShieldCheck, CheckCircle2, AlertCircle,
 } from 'lucide-vue-next';
+import { grossUpForPaystack } from '@/composables/usePaystackFees.js';
 import api from '@/composables/useApi.js';
 
 const souvenirs = ref([]);
@@ -220,6 +237,7 @@ const buyModal  = ref(false);
 const cartOpen  = ref(false);
 const buying    = ref(null);
 const buyQty    = ref(1);
+const buyFees   = computed(() => grossUpForPaystack((buying.value?.price || 0) * buyQty.value));
 const buyBusy   = ref(false);
 const buyErr    = ref('');
 const toast     = ref('');
@@ -277,7 +295,7 @@ const submitOrder = async () => {
     if (pubKey && window.PaystackPop) {
       const handler = window.PaystackPop.setup({
         key: pubKey, email: buyForm.buyer_email,
-        amount: Math.round(buying.value.price * buyQty.value * 100),
+        amount: Math.round(buyFees.value.total * 100),
         ref: reference, currency: 'NGN',
         onClose: () => { buyBusy.value=false; },
         callback: () => {

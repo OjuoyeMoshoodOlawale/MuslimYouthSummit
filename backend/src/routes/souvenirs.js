@@ -106,6 +106,8 @@ router.post('/souvenirs/:id/order', async (req, res, next) => {
 
     const unit_price   = parseFloat(sv.price);
     const total_amount = unit_price * parseInt(quantity);
+    // Gross up so the org receives the exact item total after Paystack's cut
+    const { total: chargeAmount } = grossUpForPaystack(total_amount);
     const reference    = `SVN-${Date.now()}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
 
     // Generate human-readable order number: SVN-25-000001
@@ -129,18 +131,21 @@ router.post('/souvenirs/:id/order', async (req, res, next) => {
     // Initiate Paystack
     const payData = await initializeTransaction({
       email:        buyer_email.toLowerCase(),
-      amount:       Math.round(total_amount * 100), // kobo
+      amount:       Math.round(chargeAmount * 100), // kobo (item total + Paystack fee)
       reference,
       metadata:     { souvenir_id: sv.id, order_id: r.insertId, buyer_name, souvenir_name: sv.name, quantity },
       callback_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/shop/verify?ref=${reference}`,
     });
 
     created(res, {
-      order_id:    r.insertId,
+      order_id:     r.insertId,
       reference,
-      payment_url: payData.authorization_url,
-      access_code: payData.access_code,
-      total:       total_amount,
+      payment_url:  payData.authorization_url,
+      access_code:  payData.access_code,
+      public_key:   process.env.PAYSTACK_PUBLIC_KEY,
+      subtotal:     total_amount,
+      total:        chargeAmount,
+      fee:          chargeAmount - total_amount,
     }, `Order placed. Complete payment to confirm.`);
   } catch (e) { next(e); }
 });
