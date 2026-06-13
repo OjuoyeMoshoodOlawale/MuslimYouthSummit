@@ -54,25 +54,33 @@ app.use(cors({
 }));
 
 // ─── Rate Limiting ───────────────────────────────────────────
+// General limiter — generous, for high-volume event operations (check-in, scans).
+// A gate scanning thousands of tickets must not be throttled.
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 200,
+  windowMs: 60 * 1000,          // 1 minute window
+  max: 300,                     // 300 requests/min per IP (≈5/sec) — plenty for rapid scanning
   standardHeaders: true,
   legacyHeaders: false,
+  // Don't count successful reads against the limit as harshly
+  skip: (req) => req.method === 'OPTIONS',
   message: { success: false, message: 'Too many requests. Please slow down and try again.' },
 });
 
+// Login — strict to prevent brute force
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 10,                      // 10 login attempts per 15 min
   standardHeaders: true,
+  skipSuccessfulRequests: true, // only count FAILED logins
   message: { success: false, message: 'Too many login attempts. Try again in 15 minutes.' },
 });
 
+// Payment initiation — moderate (a user retrying after closing popup is normal)
 const paymentLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
-  max: 20,
-  message: { success: false, message: 'Too many payment requests. Please wait before trying again.' },
+  max: 30,                      // 30 initiate attempts per 10 min per IP
+  standardHeaders: true,
+  message: { success: false, message: 'Too many payment attempts. Please wait a moment and try again.' },
 });
 
 app.use('/api/', globalLimiter);

@@ -6,6 +6,9 @@
       <div class="text-right">
         <p class="text-white/40 text-xs uppercase tracking-widest">Check-In Station</p>
         <p class="font-bold text-sm">{{ eventStore.activeEvent?.title || 'No Active Event' }}</p>
+        <p v-if="sessionCheckins > 0" class="text-brand-gold text-xs mt-0.5">
+          You've checked in {{ sessionCheckins }} this session
+        </p>
       </div>
     </div>
 
@@ -34,7 +37,7 @@
 
         <!-- Manual entry (primary method) -->
         <div class="flex gap-2">
-          <input v-model="manualInput"
+          <input v-model="manualInput" ref="inputEl"
             class="input bg-gray-700 border-gray-600 text-white placeholder-gray-500 flex-1 text-sm font-mono"
             :placeholder="ticketPlaceholder"
             @keyup.enter="lookup(manualInput)" />
@@ -209,7 +212,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { QrCode, Tag, Users, BedDouble , Search} from 'lucide-vue-next';
 import QrScanner from '@/components/admin/QrScanner.vue';
 import { useEventStore } from '@/stores/eventStore.js';
@@ -223,6 +226,9 @@ const ticketPlaceholder = computed(() => {
   return `${prefix}-${yy}-000001`;
 });
 const manualInput      = ref('');
+const inputEl          = ref(null);
+const sessionScans     = ref(0);
+const sessionCheckins  = ref(0);
 const tagInput         = ref('');
 const roomNumber       = ref('');
 const found            = ref(null);
@@ -321,6 +327,7 @@ const lookup = async (input) => {
   if (!val) return;
   // Reflect the formatted value back so the user sees the corrected number
   manualInput.value = val;
+  sessionScans.value++;
   notFoundMsg.value = '';
   found.value = null;
   hostelAssignment.value = null;
@@ -370,7 +377,10 @@ const doCheckIn = async () => {
     }
 
     flash(`${found.value.participant_name} checked in!${tagInput.value ? ' Tag: '+tagInput.value.toUpperCase() : ''}`);
-    found.value=null; refreshStats();
+    sessionCheckins.value++;
+    found.value=null; manualInput.value=''; refreshStats();
+    // Auto-refocus the input for the next scan (high-volume gate flow)
+    nextTick(() => { inputEl.value?.focus(); });
 
     // Refresh hostel availability
     if (eventStore.activeEvent) {
