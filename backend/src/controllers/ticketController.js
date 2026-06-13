@@ -1,6 +1,7 @@
 import { query, transaction } from '../database/db.js';
 import { success, created, error, notFound as notFoundRes } from '../utils/response.js';
 import { initializeTransaction, verifyTransaction, verifyWebhookSignature } from '../services/paystackService.js';
+import { grossUpForPaystack } from '../utils/paystackFees.js';
 import { generateQRCodeSVG, ticketQRData } from '../services/qrcodeService.js';
 import { sendTicketEmail } from '../services/emailService.js';
 import {
@@ -45,7 +46,10 @@ export const initiateTicketPurchase = async (req, res, next) => {
     const earlyBirdOpen = events[0].early_bird_closes_at && new Date(events[0].early_bird_closes_at) > new Date();
     const isEarlyBird   = earlyBirdOpen && !!ticketType.early_bird_price;
     const price         = isEarlyBird ? parseFloat(ticketType.early_bird_price) : parseFloat(ticketType.regular_price);
-    const amountKobo    = toKobo(price);
+    // Gross up so the organisation receives the EXACT ticket price after Paystack's cut.
+    // The buyer pays price + processing fee.
+    const { total: chargeAmount } = grossUpForPaystack(price);
+    const amountKobo    = toKobo(chargeAmount);
 
     // Find or create participant (schema: name, email, phone, gender, occupation)
     let participantId;

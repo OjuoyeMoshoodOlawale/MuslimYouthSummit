@@ -134,6 +134,28 @@
               <span>{{ serverError }}</span>
             </div>
 
+            <!-- Fee breakdown -->
+            <div v-if="selectedPrice > 0" class="bg-brand-cream border border-brand-gold/30 p-4 space-y-2">
+              <div class="flex justify-between text-sm">
+                <span class="text-gray-600">Ticket price</span>
+                <span class="font-semibold text-gray-800">{{ fmtNaira(feeInfo.subtotal) }}</span>
+              </div>
+              <div class="flex justify-between text-sm">
+                <span class="text-gray-600 flex items-center gap-1">
+                  Payment processing fee
+                  <span class="text-xs text-gray-400">(Paystack)</span>
+                </span>
+                <span class="font-semibold text-gray-600">{{ fmtNaira(feeInfo.fee) }}</span>
+              </div>
+              <div class="flex justify-between text-base pt-2 border-t border-brand-gold/20">
+                <span class="font-bold text-brand-green">Total to pay</span>
+                <span class="font-display font-bold text-brand-green">{{ fmtNaira(feeInfo.total) }}</span>
+              </div>
+              <p class="text-xs text-gray-400 pt-1">
+                The processing fee is added so the full ticket price reaches the organisers.
+              </p>
+            </div>
+
             <!-- Pay button -->
             <div class="pt-2">
               <button type="submit"
@@ -145,7 +167,7 @@
                 </span>
                 <span v-else class="flex items-center gap-2">
                   <CreditCard :size="16" />
-                  Pay ₦{{ fmtP(selectedPrice) }} with Paystack
+                  Pay {{ fmtNaira(feeInfo.total) }} with Paystack
                 </span>
               </button>
             </div>
@@ -165,6 +187,7 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useForm, validators as v } from '@/composables/useForm.js';
+import { grossUpForPaystack, fmtNaira } from '@/composables/usePaystackFees.js';
 import { useEventStore } from '@/stores/eventStore.js';
 import {
   Ticket, CalendarX, MapPin, Info, Zap, GraduationCap,
@@ -232,6 +255,7 @@ const selectedPrice = computed(() => {
 });
 
 const fmtP       = (n) => Number(n || 0).toLocaleString('en-NG');
+const feeInfo    = computed(() => grossUpForPaystack(selectedPrice.value));
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-NG',{day:'numeric',month:'long',year:'numeric'}) : '';
 
 // Validation handled by useForm
