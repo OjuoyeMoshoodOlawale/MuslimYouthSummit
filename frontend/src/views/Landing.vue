@@ -222,9 +222,14 @@
             </p>
             <h2 class="font-display font-bold text-3xl md:text-4xl text-brand-green">Full Schedule</h2>
           </div>
-          <button class="btn-green text-xs" @click="scrollTo('tickets')">
+          <button v-if="eventStore.isRegistrationOpen" class="btn-green text-xs" @click="scrollTo('tickets')">
             <Ticket :size="13" /> Register for Ticket
           </button>
+          <div v-else-if="eventStore.isPastEvent && recordingsCount > 0"
+            class="flex items-center gap-2 bg-red-50 border border-red-200 text-red-600 px-4 py-2 text-xs font-semibold">
+            <Youtube :size="14" />
+            {{ recordingsCount }} session recording{{ recordingsCount > 1 ? 's' : '' }} available — click the red buttons to watch
+          </div>
         </div>
         <!-- Day tabs -->
         <div v-if="eventDays.length > 1" class="flex gap-2 mb-6 overflow-x-auto pb-1">
@@ -566,6 +571,7 @@ const gallery        = ref([]);
 const sponsors          = ref([]);
 const featuredSouvenirs = ref([]);
 const lectures       = ref([]);
+const recordingsCount = computed(() => lectures.value.filter(l => l.youtube_url).length);
 const eventDays      = ref([]);
 const pastEvents     = ref([]);
 const heroStep       = ref(0);
