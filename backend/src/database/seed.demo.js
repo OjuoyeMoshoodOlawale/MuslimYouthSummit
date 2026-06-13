@@ -291,23 +291,85 @@ Attendees will benefit from:
 
   /* 9. MYS3 SCHEDULE — with event_day_id and youtube_url */
   console.log('\n📋 Schedule...');
+  /* ─── Schedule: Real Islamic Lecture Content ──────────────── */
   const schedData = [
-    // [event_day_id, s_n, start, end, title, type, speaker_name, facilitators, youtube_url, speaker_id]
-    [day1Id, 1,'08:00','08:30','Registration & Welcome Desk',                  'other',   null,                    'Gate Attendant, Coordinator Musa',   null,                                         null ],
-    [day1Id, 2,'08:30','09:00',"Fajr Prayer & Qur'an Recitation",               'prayer',  null,                    'Ustaz Ibrahim Aliyu',                 null,                                         null ],
-    [day1Id, 3,'09:00','10:00','Opening Keynote: Rooted in Faith',              'keynote', 'Sheikh Murtadha Gusau', 'Coordinator Musa, Sister Fatima',     null,                                         spk0 ],
-    [day1Id, 4,'10:15','11:30','Fiqh of the Contemporary Muslim',              'lecture', 'Sheikh Murtadha Gusau', 'Coordinator Musa',                    'https://youtube.com/watch?v=mys3_lecture1',  spk0 ],
-    [day1Id, 5,'11:30','12:00','Networking & Refreshment Break',               'break',   null,                    null,                                  null,                                         null ],
-    [day1Id, 6,'12:00','13:00','Women in Islam: Empowerment & Identity',        'lecture', 'Dr. Aisha Mahmoud',     'Sister Fatima',                       null,                                         spk1 ],
-    [day1Id, 7,'13:00','14:00','Dhuhr Prayer & Lunch',                          'prayer',  null,                    null,                                  null,                                         null ],
-    [day1Id, 8,'14:00','15:30','Career Development Masterclass',               'workshop','Dr. Aisha Mahmoud',     'Coordinator Musa, Sister Fatima',     'https://youtube.com/watch?v=mys3_workshop1',  spk1 ],
-    [day1Id, 9,'15:30','16:00','Asr Prayer',                                   'prayer',  null,                    'Ustaz Ibrahim Aliyu',                 null,                                         null ],
-    [day2Id,10,'08:30','09:30','Morning Reflection: The Purposeful Muslim',    'lecture', 'Ustaz Ibrahim Aliyu',   'Gate Attendant',                      null,                                         spk2 ],
-    [day2Id,11,'09:45','11:00','Technology, Business & Islamic Ethics',        'lecture', 'Engr. Bilal Okafor',    'Coordinator Musa',                    'https://youtube.com/watch?v=mys3_lecture2',  spk3 ],
-    [day2Id,12,'11:15','12:30','Panel: Faith at the Workplace',                'panel',   'Dr. Aisha Mahmoud',     'Coordinator Musa, Sister Fatima',     null,                                         spk1 ],
-    [day2Id,13,'12:30','13:30','Dhuhr Prayer & Lunch',                         'prayer',  null,                    null,                                  null,                                         null ],
-    [day2Id,14,'13:30','15:00','Breakout Sessions by Category',                'workshop',null,                    'Coordinator Musa, Sister Fatima',     null,                                         null ],
-    [day2Id,15,'15:30','16:30','Closing Ceremony & Awards Night',              'other',   null,                    'Coordinator Musa',                    null,                                         null ],
+
+    // ── DAY 1: Knowledge & Reformation ─────────────────────────
+
+    [day1Id, 1,'08:00','08:30',
+      'Registration, Tag Collection & Welcome Desk',
+      'other', null, 'Gate Attendant, Coordinator Musa', null, null],
+
+    [day1Id, 2,'08:30','09:00',
+      "Fajr Prayer & Qur'an Recitation — Surah Al-Kahf (Verses 1–10 & 103–110)",
+      'prayer', null, 'Ustaz Ibrahim Aliyu', null, null],
+
+    [day1Id, 3,'09:00','10:00',
+      "Opening Keynote: Who Are We? Rebuilding the Islamic Identity of Nigerian Youth — Drawing on the hadith of the Prophet ﷺ: 'Islam began as something strange and will return to being strange, so give glad tidings to the strangers.' What does it mean to be a Muslim youth in 21st century Nigeria?",
+      'keynote', 'Sheikh Murtadha Gusau', 'Coordinator Musa, Sister Fatima',
+      'https://www.youtube.com/watch?v=LXb3EKWsInQ', spk0],
+
+    [day1Id, 4,'10:15','11:45',
+      "Al-Aqeedah First: Why Correct Belief Is the Foundation of Every Good Deed — A deep study of the Six Pillars of Iman and their practical implications for the Muslim youth in a secular society. Addressing modern doubts about Tawheed, the reality of Shirk in our daily lives, and how atheism is spreading among Muslim youth through social media",
+      'lecture', 'Sheikh Murtadha Gusau', 'Coordinator Musa',
+      'https://www.youtube.com/watch?v=LXb3EKWsInQ', spk0],
+
+    [day1Id, 5,'11:45','12:15',
+      'Networking Break — Tea, Refreshments & Dua Cards',
+      'break', null, null, null, null],
+
+    [day1Id, 6,'12:15','13:15',
+      "The Muslim Woman Today: Reclaiming the Narrative — How Islam truly elevates women above all other systems. A lecture addressing the hijab pressure in the workplace, gender mixing in offices, the right to education and career from Islamic sources, and how Muslim women are breaking barriers without compromising their deen",
+      'lecture', 'Dr. Aisha Mahmoud', 'Sister Fatima', null, spk1],
+
+    [day1Id, 7,'13:15','14:15',
+      "Dhuhr Prayer, Lunch & Group Dhikr — Recitation of Subhanallah (33×), Alhamdulillah (33×), Allahu Akbar (34×) after Salah",
+      'prayer', null, 'Ustaz Ibrahim Aliyu', null, null],
+
+    [day1Id, 8,'14:15','15:45',
+      "Career Success Without Compromising Your Deen: The Prophetic Framework for Professional Excellence — Based on the hadith: 'Verily Allah loves that when any of you does a job, he does it with itqan (proficiency/excellence)'. Practical session covering CV writing, interview skills, salary negotiation, office politics, and navigating haram situations at work — all from an Islamic lens",
+      'workshop', 'Dr. Aisha Mahmoud', 'Coordinator Musa, Sister Fatima',
+      'https://www.youtube.com/watch?v=LXb3EKWsInQ', spk1],
+
+    [day1Id, 9,'15:45','16:15',
+      "Asr Prayer & Tazkiyah Moment — Short reminder on the importance of Salah in the life of the Muslim youth",
+      'prayer', null, 'Ustaz Ibrahim Aliyu', null, null],
+
+    [day1Id,10,'16:15','17:00',
+      "Tazkiyah: Purifying the Heart in the Age of Social Media — Lessons from Imam Al-Ghazali's Ihya Ulum Al-Deen on fighting the nafs, curing the disease of the heart (hasad, kibr, riya), overcoming social media addiction, and keeping the heart alive through consistent dhikr and Quran",
+      'lecture', 'Ustaz Ibrahim Aliyu', 'Coordinator Musa',
+      'https://www.youtube.com/watch?v=LXb3EKWsInQ', spk2],
+
+    // ── DAY 2: Career & Leadership ──────────────────────────────
+
+    [day2Id,11,'08:30','09:15',
+      "Morning Motivation: The Hadith of the Three Questions — The Prophet ﷺ said every son of Adam will be questioned about: his life, his youth, his wealth and how he earned and spent it, and his knowledge. An energising session to set the tone for Day 2 with actionable goals",
+      'lecture', 'Ustaz Ibrahim Aliyu', 'Gate Attendant', null, spk2],
+
+    [day2Id,12,'09:30','11:00',
+      "Halal Tech, Fintech & Entrepreneurship with Barakah — Is crypto halal? How to identify riba in Nigerian financial products (loans, mortgages, insurance). Building tech startups on Islamic principles. Case studies of successful Muslim entrepreneurs in Nigeria and beyond. The concept of Sadaqah Jariyah through business",
+      'lecture', 'Engr. Bilal Okafor', 'Coordinator Musa',
+      'https://www.youtube.com/watch?v=LXb3EKWsInQ', spk3],
+
+    [day2Id,13,'11:15','12:30',
+      "Panel: Staying on the Deen in the Nigerian Corporate World — How do you handle: mixed-gender team hangouts, Christmas office parties, Friday Jumu'ah vs board meetings, office gossip and backbiting, colleagues pressuring you to compromise? Real talk with professionals sharing lived experiences",
+      'panel', 'Dr. Aisha Mahmoud', 'Coordinator Musa, Sister Fatima', null, spk1],
+
+    [day2Id,14,'12:30','13:30',
+      "Dhuhr Prayer, Lunch & Group Supplication — Special Du'a for Nigerian Muslim youth, parents and the Ummah",
+      'prayer', null, null, null, null],
+
+    [day2Id,15,'13:30','15:00',
+      "Breakout Sessions by Category — YOUTH: Staying firm on the Deen in University (mixing, alcohol pressure, relationships) | GRADUATE: Postgrad scholarships, Islamic studies abroad & postgrad life | PROFESSIONAL: Islamic leadership, management styles from the Seerah, navigating office politics Islamically",
+      'workshop', null, 'Coordinator Musa, Sister Fatima, Ustaz Ibrahim Aliyu', null, null],
+
+    [day2Id,16,'15:00','15:30',
+      "Asr Prayer & Du'a for the Ummah — Special supplication led by Sheikh Murtadha Gusau for Nigeria, Palestine and all Muslim communities",
+      'prayer', null, 'Sheikh Murtadha Gusau', null, null],
+
+    [day2Id,17,'15:30','16:30',
+      "Closing Ceremony: Covenant of Excellence — Awards for most engaged participants, pledge by all attendees to carry the knowledge home, group nasheeed recitation, and final du'a. In sha Allah, see you at MYS4!",
+      'other', null, 'Coordinator Musa', null, null],
   ];
   for (const [event_day_id,s_n,st,et,title,ltype,speaker,fac,yt,spkId] of schedData) {
     const [r] = await q(
@@ -317,7 +379,7 @@ Attendees will benefit from:
     );
     if (spkId) await q('INSERT IGNORE INTO lecture_speakers (lecture_id,speaker_id,sort_order) VALUES (?,?,0)',[r.insertId,spkId]);
   }
-  log(`✅ ${schedData.length} sessions (3 with YouTube links)`);
+  log(`✅ ${schedData.length} sessions with real Islamic lecture content`);
 
   /* 10. TICKET TYPES */
   console.log('\n🎟  Ticket types...');

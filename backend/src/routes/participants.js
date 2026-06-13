@@ -45,8 +45,8 @@ router.get('/participants', authenticate, async (req, res, next) => {
          c.name  AS category_name, c.color AS category_color,
          a.checked_in_at, a.checked_out_at, a.id AS attendance_id
        FROM participants p ${joins} ${where}
-       ORDER BY p.created_at DESC LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+       ORDER BY p.created_at DESC LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}`,
+      params
     );
 
     paginated(res, rows, buildPagination(total, page, limit, rows.length));

@@ -11,7 +11,7 @@ const adm = [authenticate, authorize('super_admin', 'admin')];
 /* ── List campaigns ──────────────────────────────────────────── */
 
 /* ── Test email (admin only) ──────────────────────────────── */
-router.post('/email/test', authenticate, authorize('super_admin','admin'), async (req, res, next) => {
+router.post('/test', authenticate, authorize('super_admin','admin'), async (req, res, next) => {
   try {
     const to = req.body.email || req.admin.email;
     await sendTestEmail(to);
