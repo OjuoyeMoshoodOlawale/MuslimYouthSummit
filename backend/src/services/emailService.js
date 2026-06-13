@@ -71,15 +71,14 @@ const wrap = (content) => `
 </html>`;
 
 /* ── Core send function ───────────────────────────────────── */
-const send = async ({ to, subject, html }) => {
+const send = async ({ to, subject, html, attachments }) => {
   const t = createTransporter();
-  // Note: verify() removed from here — it adds 300ms per email.
-  // Use `node scripts/test-email.js` to verify SMTP config.
   const info = await t.sendMail({
     from:    process.env.EMAIL_FROM || `Muslim Youth Summit <${process.env.SMTP_USER}>`,
     to,
     subject,
     html,
+    ...(attachments ? { attachments } : {}),
   });
   console.log(`  [Email] Sent to ${to} — MessageId: ${info.messageId}`);
   return info;
@@ -113,11 +112,20 @@ export const sendTestEmail = async (to) => {
 
 /** Ticket confirmation email — styled to match the printed ticket */
 export const sendTicketEmail = async (ticket) => {
-  // Generate QR code as base64 PNG (works in all email clients)
+  // Generate QR code as a CID attachment (most reliable across email clients —
+  // Gmail/Outlook often block base64 data: URIs but render cid: attachments)
   let qrDataUrl = '';
+  let qrAttachment = null;
   try {
-    const qrData = ticketQRData(ticket.unique_number);
-    qrDataUrl = await generateQRCodePNG(qrData);
+    const qrData  = ticketQRData(ticket.unique_number);
+    qrDataUrl     = await generateQRCodePNG(qrData);   // data:image/png;base64,...
+    const base64  = qrDataUrl.split(',')[1];
+    qrAttachment  = {
+      filename:    `ticket-${ticket.unique_number}.png`,
+      content:     base64,
+      encoding:    'base64',
+      cid:         'ticketqr@mys',   // referenced as <img src="cid:ticketqr@mys">
+    };
   } catch { /* QR generation failed — email still sends without it */ }
 
   const fmtDate = (d) => {
@@ -260,15 +268,15 @@ export const sendTicketEmail = async (ticket) => {
           </p>
 
           <!-- QR code — centred -->
-          ${qrDataUrl ? `
+          ${qrAttachment ? `
           <table cellpadding="0" cellspacing="0" width="100%">
             <tr>
               <td align="center" style="padding:20px;background:#ffffff;
                 border:2px solid rgba(2,70,46,0.15)">
-                <img src="${qrDataUrl}"
+                <img src="cid:ticketqr@mys"
                   width="160" height="160"
                   alt="Ticket QR Code: ${ticket.unique_number}"
-                  style="display:block;border:0" />
+                  style="display:block;border:0;width:160px;height:160px" />
                 <p style="color:#999;font-size:11px;margin:10px 0 0">
                   Scan or show at the event gate
                 </p>
@@ -353,9 +361,10 @@ export const sendTicketEmail = async (ticket) => {
 </html>`;
 
   return send({
-    to:      ticket.participant_email,
-    subject: `Ticket Confirmed: ${ticket.unique_number} — ${ticket.event_title}`,
+    to:          ticket.participant_email,
+    subject:     `Ticket Confirmed: ${ticket.unique_number} — ${ticket.event_title}`,
     html,
+    attachments: qrAttachment ? [qrAttachment] : undefined,
   });
 };
 
@@ -391,6 +400,81 @@ export const sendBulkCampaignEmails = async (recipients, subject, bodyHtml, onPr
     if (i + BATCH < recipients.length) await new Promise(r => setTimeout(r, 2000));
   }
   return { sent, failed, logs };
+};
+
+/** Welcome email — sent when participant checks IN */
+export const sendCheckInEmail = async ({ to, name, eventTitle, tagNumber }) => {
+  const html = wrap(`
+    <h2 style="color:${B.green};font-size:22px;margin:0 0 12px">Welcome to ${eventTitle}!</h2>
+    <p style="color:#555;font-size:15px;line-height:1.7">
+      Assalamu Alaikum <strong>${name}</strong>,<br/>
+      You have been successfully checked in. We are delighted to have you with us!
+    </p>
+    ${tagNumber ? `
+    <div style="background:${B.cream};border-left:4px solid ${B.gold};padding:16px 20px;margin:20px 0">
+      <p style="color:#666;font-size:12px;margin:0 0 4px;text-transform:uppercase;letter-spacing:1px">Your Tag Number</p>
+      <p style="color:${B.green};font-size:22px;font-weight:800;margin:0;font-family:monospace">${tagNumber}</p>
+    </div>` : ''}
+    <p style="color:#555;font-size:14px;line-height:1.7">
+      Please keep your tag visible at all times. Enjoy the sessions, connect with fellow attendees,
+      and may this gathering be a means of benefit and barakah for you. JazakAllahu Khayran!
+    </p>
+    <p style="color:${B.green};font-size:14px;font-weight:700;margin:16px 0 0">The MYS Team</p>
+  `);
+  return send({ to, subject: `Welcome to ${eventTitle}! You're checked in`, html });
+};
+
+/** Thank-you email — sent when participant checks OUT */
+export const sendCheckOutEmail = async ({ to, name, eventTitle }) => {
+  const html = wrap(`
+    <h2 style="color:${B.green};font-size:22px;margin:0 0 12px">Thank You for Attending!</h2>
+    <p style="color:#555;font-size:15px;line-height:1.7">
+      Assalamu Alaikum <strong>${name}</strong>,<br/>
+      Thank you for attending <strong>${eventTitle}</strong>. We hope you found the sessions
+      beneficial and that you leave inspired and reformed.
+    </p>
+    <div style="background:${B.cream};border-left:4px solid ${B.green};padding:16px 20px;margin:20px 0">
+      <p style="color:#444;font-size:14px;margin:0;line-height:1.7">
+        Your certificate of attendance will be emailed to you once the event concludes.
+        Stay tuned for session recordings and photos!
+      </p>
+    </div>
+    <p style="color:#555;font-size:14px;line-height:1.7">
+      May Allah accept our gathering and make us among those who listen to the word and follow the best of it.
+    </p>
+    <p style="color:${B.green};font-size:14px;font-weight:700;margin:16px 0 0">Barakallahu feekum &mdash; The MYS Team</p>
+  `);
+  return send({ to, subject: `Thank you for attending ${eventTitle}`, html });
+};
+
+/** Certificate email — sent when event is marked completed */
+export const sendCertificateEmail = async ({ to, name, eventTitle, uniqueNumber }) => {
+  const certUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/certificate/${uniqueNumber}`;
+  const html = wrap(`
+    <h2 style="color:${B.green};font-size:22px;margin:0 0 12px">Your Certificate Is Ready!</h2>
+    <p style="color:#555;font-size:15px;line-height:1.7">
+      Assalamu Alaikum <strong>${name}</strong>,<br/>
+      Thank you for attending <strong>${eventTitle}</strong>. Your Certificate of Attendance
+      is now available.
+    </p>
+    <div style="text-align:center;margin:28px 0">
+      <a href="${certUrl}"
+        style="display:inline-block;background:${B.green};color:#fff;padding:14px 32px;
+               text-decoration:none;font-weight:700;font-size:15px;border-radius:4px">
+        Download Your Certificate
+      </a>
+    </div>
+    <div style="background:${B.cream};padding:16px 20px;margin:20px 0">
+      <p style="color:#666;font-size:12px;margin:0 0 4px;text-transform:uppercase;letter-spacing:1px">Your Reference</p>
+      <p style="color:${B.green};font-size:18px;font-weight:800;margin:0;font-family:monospace">${uniqueNumber}</p>
+      <p style="color:#888;font-size:12px;margin:8px 0 0">
+        You can verify your certificate anytime using this ticket number or your tag number at
+        ${process.env.FRONTEND_URL || 'muslimyouthsummit.com'}/certificate
+      </p>
+    </div>
+    <p style="color:${B.green};font-size:14px;font-weight:700;margin:16px 0 0">JazakAllahu Khayran &mdash; The MYS Team</p>
+  `);
+  return send({ to, subject: `Your Certificate — ${eventTitle}`, html });
 };
 
 /** Facilitator reminder email */
