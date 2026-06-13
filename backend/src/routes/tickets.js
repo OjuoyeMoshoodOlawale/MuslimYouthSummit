@@ -24,8 +24,21 @@ router.get('/admin/all',         authenticate, authorize('super_admin','admin'),
 router.get('/admin/stats/:eventId', authenticate, authorize('super_admin','admin'), adminTicketStats);
 
 // Lookup by unique_number for check-in scanner
-router.get('/by-number/:num', authenticate, (req, res, next) => {
-  req.params.uniqueNumber = req.params.num;
+router.get('/by-number/:num', authenticate, async (req, res, next) => {
+  let num = (req.params.num || '').trim();
+  // If a TAG number was scanned (e.g. TAG-001), resolve it to its ticket's unique_number
+  if (/^TAG-/i.test(num)) {
+    try {
+      const [rows] = await query(
+        `SELECT t.unique_number FROM event_tags et
+         JOIN tickets t ON t.id = et.ticket_id
+         WHERE et.tag_number = ? LIMIT 1`,
+        [num.toUpperCase()]
+      );
+      if (rows.length) num = rows[0].unique_number;
+    } catch { /* fall through — try as-is */ }
+  }
+  req.params.uniqueNumber = num;
   return getTicket(req, res, next);
 });
 router.get('/:uniqueNumber', getTicket);

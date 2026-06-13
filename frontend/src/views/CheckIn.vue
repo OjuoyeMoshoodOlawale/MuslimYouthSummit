@@ -26,23 +26,38 @@
         </div>
       </div>
 
-      <!-- Scanner -->
-      <div class="bg-gray-800 rounded-lg p-4 space-y-4">
-        <div class="flex items-center justify-between">
-          <h2 class="font-display font-bold flex items-center gap-2">
-            <QrCode :size="16" class="text-brand-gold" /> Scan Ticket
-          </h2>
-          <button class="text-xs text-gray-400 hover:text-white transition-colors"
-            @click="showScanner=!showScanner">
-            {{ showScanner ? 'Hide Camera' : 'Show Camera' }}
+      <!-- Ticket lookup -->
+      <div class="bg-gray-800 rounded-lg p-4 space-y-3">
+        <h2 class="font-display font-bold flex items-center gap-2">
+          <Search :size="16" class="text-brand-gold" /> Find Ticket
+        </h2>
+
+        <!-- Manual entry (primary method) -->
+        <div class="flex gap-2">
+          <input v-model="manualInput"
+            class="input bg-gray-700 border-gray-600 text-white placeholder-gray-500 flex-1 text-sm font-mono"
+            :placeholder="ticketPlaceholder"
+            @keyup.enter="lookup(manualInput)" />
+          <button class="btn-gold text-xs px-5 py-2 flex-shrink-0" @click="lookup(manualInput)">
+            Find
           </button>
         </div>
-        <QrScanner v-if="showScanner" @scan="handleScan" />
-        <div class="flex gap-2">
-          <input v-model="manualInput" class="input bg-gray-700 border-gray-600 text-white placeholder-gray-500 flex-1 text-sm"
-            placeholder="Ticket number (e.g. MYS3-0001)"
-            @keyup.enter="lookup(manualInput)" />
-          <button class="btn-gold text-xs px-4 py-2" @click="lookup(manualInput)">Find</button>
+        <p class="text-xs text-gray-500">
+          Type the full number or just the digits — we'll auto-complete the prefix.
+          e.g. <span class="text-gray-400 font-mono">1</span> →
+          <span class="text-brand-gold font-mono">{{ ticketPlaceholder }}</span>
+        </p>
+
+        <!-- Scan option (toggle) -->
+        <div class="pt-2 border-t border-gray-700">
+          <button class="text-xs text-gray-400 hover:text-brand-gold transition-colors flex items-center gap-1.5"
+            @click="showScanner=!showScanner">
+            <QrCode :size="14" />
+            {{ showScanner ? 'Hide camera scanner' : 'Or scan QR code with camera' }}
+          </button>
+          <div v-if="showScanner" class="mt-3">
+            <QrScanner @scan="handleScan" />
+          </div>
         </div>
       </div>
 
@@ -195,13 +210,18 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { QrCode, Tag, Users, BedDouble } from 'lucide-vue-next';
+import { QrCode, Tag, Users, BedDouble , Search} from 'lucide-vue-next';
 import QrScanner from '@/components/admin/QrScanner.vue';
 import { useEventStore } from '@/stores/eventStore.js';
 import api from '@/composables/useApi.js';
 
 const eventStore       = useEventStore();
-const showScanner      = ref(true);
+const showScanner      = ref(false);
+const ticketPlaceholder = computed(() => {
+  const prefix = (eventStore.activeEvent?.ticket_prefix || eventStore.activeEvent?.edition || 'MYS3').toUpperCase();
+  const yy = new Date().getFullYear().toString().slice(-2);
+  return `${prefix}-${yy}-000001`;
+});
 const manualInput      = ref('');
 const tagInput         = ref('');
 const roomNumber       = ref('');
@@ -251,16 +271,63 @@ const refreshStats = async () => {
 
 const flash = (msg, ms=3500) => { successMsg.value=msg; setTimeout(()=>{ successMsg.value=''; },ms); };
 
-const handleScan = (text) => lookup(text.trim());
+/** QR codes may encode a full URL (e.g. .../ticket/MYS3-25-000001 or
+ *  .../check-in?tag=TAG-001). Extract the usable identifier from any format. */
+const handleScan = (text) => {
+  let scanned = (text || '').trim();
+
+  // Full URL → extract ticket number or tag
+  try {
+    if (scanned.startsWith('http')) {
+      const url = new URL(scanned);
+      // /ticket/MYS3-25-000001
+      const ticketMatch = url.pathname.match(/\/ticket\/([^/]+)/i);
+      if (ticketMatch) { scanned = decodeURIComponent(ticketMatch[1]); }
+      // ?tag=TAG-001
+      else if (url.searchParams.get('tag')) { scanned = url.searchParams.get('tag'); }
+      // ?ref= or ?reference=
+      else if (url.searchParams.get('ref') || url.searchParams.get('reference')) {
+        scanned = url.searchParams.get('ref') || url.searchParams.get('reference');
+      }
+    }
+  } catch { /* not a URL — use as-is */ }
+
+  lookup(scanned);
+};
+
+/** Auto-format ticket number: add event prefix and dashes if missing */
+const formatTicketNumber = (raw) => {
+  let val = (raw || '').trim().toUpperCase().replace(/\s+/g, '');
+  if (!val) return '';
+
+  const prefix = (eventStore.activeEvent?.ticket_prefix || eventStore.activeEvent?.edition || 'MYS3').toUpperCase();
+  const yy = new Date().getFullYear().toString().slice(-2);
+
+  // If user typed only digits (e.g. "1" or "000001") → build full number
+  if (/^\d+$/.test(val)) {
+    return `${prefix}-${yy}-${val.padStart(6, '0')}`;
+  }
+  // If they typed prefix + digits without dashes (e.g. "MYS3000001")
+  const noDash = val.replace(/-/g, '');
+  const m = noDash.match(/^([A-Z0-9]+?)(\d{2})(\d{6})$/);
+  if (m && !val.includes('-')) {
+    return `${m[1]}-${m[2]}-${m[3]}`;
+  }
+  return val;
+};
 
 const lookup = async (input) => {
-  const val = (input||'').trim().toUpperCase();
+  const val = formatTicketNumber(input);
   if (!val) return;
-  notFoundMsg.value=''; found.value=null; hostelAssignment.value=null; manualInput.value='';
+  // Reflect the formatted value back so the user sees the corrected number
+  manualInput.value = val;
+  notFoundMsg.value = '';
+  found.value = null;
+  hostelAssignment.value = null;
+  // NOTE: do NOT clear manualInput here — keep it so user can retry without retyping
   try {
     const { data } = await api.get(`/tickets/by-number/${encodeURIComponent(val)}`);
-    found.value=data.data; tagInput.value=''; selectedCategory.value=null; selectedHostel.value=null; roomNumber.value='';
-    // Fetch hostel assignment if already checked in
+    found.value = data.data; tagInput.value=''; selectedCategory.value=null; selectedHostel.value=null; roomNumber.value='';
     if (found.value?.id) {
       try {
         const { data: ha } = await api.get(`/tickets/${found.value.id}/hostel`);
@@ -268,8 +335,8 @@ const lookup = async (input) => {
       } catch {}
     }
   } catch (err) {
-    notFoundMsg.value = err.response?.data?.message || 'Ticket not found.';
-    setTimeout(()=>{ notFoundMsg.value=''; }, 4000);
+    notFoundMsg.value = err.response?.data?.message || `Ticket "${val}" not found. Check the number and try again.`;
+    // Keep manualInput intact so they can edit and retry — no auto-clear
   }
 };
 
