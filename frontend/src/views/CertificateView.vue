@@ -44,20 +44,20 @@
         <div id="certificate" class="bg-white shadow-2xl border-8 border-brand-green relative overflow-hidden"
           style="aspect-ratio: 1.414/1">
           <!-- Decorative corners -->
-          <div class="absolute top-0 left-0 w-24 h-24 border-t-4 border-l-4 border-brand-gold m-4"></div>
-          <div class="absolute top-0 right-0 w-24 h-24 border-t-4 border-r-4 border-brand-gold m-4"></div>
-          <div class="absolute bottom-0 left-0 w-24 h-24 border-b-4 border-l-4 border-brand-gold m-4"></div>
-          <div class="absolute bottom-0 right-0 w-24 h-24 border-b-4 border-r-4 border-brand-gold m-4"></div>
+          <div class="absolute top-0 left-0 w-10 h-10 sm:w-24 sm:h-24 border-t-2 sm:border-t-4 border-l-2 sm:border-l-4 border-brand-gold m-2 sm:m-4"></div>
+          <div class="absolute top-0 right-0 w-10 h-10 sm:w-24 sm:h-24 border-t-2 sm:border-t-4 border-r-2 sm:border-r-4 border-brand-gold m-2 sm:m-4"></div>
+          <div class="absolute bottom-0 left-0 w-10 h-10 sm:w-24 sm:h-24 border-b-2 sm:border-b-4 border-l-2 sm:border-l-4 border-brand-gold m-2 sm:m-4"></div>
+          <div class="absolute bottom-0 right-0 w-10 h-10 sm:w-24 sm:h-24 border-b-2 sm:border-b-4 border-r-2 sm:border-r-4 border-brand-gold m-2 sm:m-4"></div>
 
-          <div class="h-full flex flex-col items-center justify-center text-center px-8 md:px-16 py-10">
-            <img src="/logos/logo-black.png" alt="MYS" class="h-12 md:h-16 mb-4" />
+          <div class="h-full flex flex-col items-center justify-center text-center px-4 sm:px-8 md:px-16 py-4 sm:py-10">
+            <img src="/logos/logo-black.png" alt="MYS" class="h-8 sm:h-12 md:h-16 mb-2 sm:mb-4" />
             <p class="text-brand-gold font-bold text-xs md:text-sm uppercase tracking-[0.3em] mb-2">
               Certificate of Attendance
             </p>
             <div class="w-16 h-0.5 bg-brand-gold mb-6"></div>
 
             <p class="text-gray-500 text-sm mb-2">This certifies that</p>
-            <h2 class="font-display font-bold text-3xl md:text-4xl text-brand-green mb-4">
+            <h2 class="font-display font-bold text-xl sm:text-3xl md:text-4xl text-brand-green mb-2 sm:mb-4">
               {{ certificate.participant_name }}
             </h2>
             <p class="text-gray-600 text-sm md:text-base max-w-lg leading-relaxed mb-6">
