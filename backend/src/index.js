@@ -109,7 +109,7 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/tags', tagRoutes);
 app.use('/api/gallery', galleryRoutes);
 app.use('/api/email', emailRoutes);
-app.use('/api/participants', participantRoutes);
+app.use('/api', participantRoutes);
 app.use('/api', scheduleRoutes);
 app.use('/api', categoryRoutes);
 app.use('/api', reportsRoutes);

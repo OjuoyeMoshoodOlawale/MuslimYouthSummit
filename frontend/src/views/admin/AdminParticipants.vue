@@ -365,6 +365,8 @@ const tagStatus     = ref(''); // '', 'checking', 'valid', 'taken'
 
 const filters = reactive({ search:'', event_id:'', category_id:'', checked_in:'', page:1 });
 const checkInForm = reactive({ tag_number:'', category_id:null, hostel_id:null, room_number:'' });
+const smsModal = ref(false);
+const smsForm  = reactive({ message:'', sending:false });
 
 let debounceTimer;
 const debouncedLoad = () => {
