@@ -11,6 +11,11 @@
           Links appear on the landing page and event schedule.
         </p>
       </div>
+      <button v-if="selectedEvent && uploadedCount > 0"
+        class="btn-green text-xs flex items-center gap-1.5" :disabled="notifying" @click="notifyAttendees">
+        <component :is="notifying ? Loader : Mail" :size="14" :class="notifying?'animate-spin':''" />
+        {{ notifying ? 'Sending…' : 'Notify Attendees' }}
+      </button>
     </div>
 
     <!-- Event selector -->
@@ -133,7 +138,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { Youtube, Loader, CheckCircle2, ExternalLink } from 'lucide-vue-next';
+import { Youtube, Loader, CheckCircle2, ExternalLink, Mail } from 'lucide-vue-next';
 import { useAlertStore } from '@/stores/alertStore.js';
 import { useEventStore } from '@/stores/eventStore.js';
 import api from '@/composables/useApi.js';
@@ -146,6 +151,7 @@ const loading    = ref(false);
 const saving     = ref(false);
 const saveMsg    = ref('');
 const selectedEvent = ref('');
+const notifying     = ref(false);
 
 onMounted(async () => {
   try {
@@ -193,6 +199,18 @@ const uploadableSessions = computed(() =>
 const uploadedCount = computed(() =>
   sessions.value.filter(s => s.youtube_url && !['prayer','break'].includes(s.lecture_type)).length
 );
+
+const notifyAttendees = async () => {
+  if (!selectedEvent.value) return;
+  if (!confirm(`Email all checked-in attendees that ${uploadedCount.value} recording(s) are now available?`)) return;
+  notifying.value = true;
+  try {
+    const { data } = await api.post(`/events/${selectedEvent.value}/notify-recordings`);
+    alert.success(data.message || 'Attendees notified.');
+  } catch (e) {
+    alert.error(e.response?.data?.message || 'Failed to notify attendees.');
+  } finally { notifying.value = false; }
+};
 
 /* Save a single session's YouTube URL */
 const saveSession = async (session) => {
