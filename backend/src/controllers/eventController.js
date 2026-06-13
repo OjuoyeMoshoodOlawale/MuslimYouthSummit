@@ -17,12 +17,30 @@ export const getActiveEvent = async (req, res, next) => {
        ORDER BY e.start_date ASC LIMIT 1`
     );
 
-    if (!events.length) return success(res, null, 'No active event.');
+    if (events.length) {
+      const event = events[0];
+      const eventData = await enrichEvent(event.id, event);
+      return success(res, { ...eventData, is_past: false });
+    }
 
-    const event = events[0];
-    const eventData = await enrichEvent(event.id, event);
+    // No active event — fall back to the most recently completed event so the
+    // landing page still shows the last event's schedule, speakers and recordings.
+    const [completed] = await query(
+      `SELECT e.*, a.name AS created_by_name
+       FROM events e
+       LEFT JOIN admins a ON a.id = e.created_by
+       WHERE e.status = 'completed'
+       ORDER BY e.end_date DESC, e.start_date DESC LIMIT 1`
+    );
 
-    return success(res, eventData);
+    if (completed.length) {
+      const event = completed[0];
+      const eventData = await enrichEvent(event.id, event);
+      // is_past = true tells the frontend to show 'Event Closed' and hide registration
+      return success(res, { ...eventData, is_past: true });
+    }
+
+    return success(res, null, 'No active event.');
   } catch (err) {
     next(err);
   }

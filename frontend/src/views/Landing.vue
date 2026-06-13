@@ -22,7 +22,7 @@
           </template>
         </div>
         <div class="flex items-center gap-2">
-          <button v-if="eventStore.hasActiveEvent"
+          <button v-if="eventStore.isRegistrationOpen"
             class="btn-gold text-xs py-2 px-4 hidden sm:inline-flex items-center gap-1.5"
             @click="scrollTo('tickets')">
             <Ticket :size="13" /> Register for Ticket
@@ -50,7 +50,7 @@
               class="block w-full text-left py-2.5 text-white/80 hover:text-brand-gold transition-colors text-sm font-semibold"
               @click="scrollTo(l.id); mobileMenuOpen=false">{{ l.label }}</button>
           </template>
-          <button v-if="eventStore.hasActiveEvent"
+          <button v-if="eventStore.isRegistrationOpen"
             class="mt-2 w-full btn-gold text-xs py-3 justify-center"
             @click="scrollTo('tickets'); mobileMenuOpen=false">
             <Ticket :size="13" /> Register for Ticket
@@ -83,10 +83,12 @@
         <div v-if="eventStore.hasActiveEvent"
           :class="heroStep>=2?'opacity-100 scale-100':'opacity-0 scale-90'"
           style="transition:all 0.5s cubic-bezier(0.34,1.56,0.64,1)" class="flex justify-center">
-          <div class="inline-flex items-center gap-2 bg-brand-gold/15 border border-brand-gold/40
-                      text-brand-gold text-xs font-bold uppercase tracking-[0.2em] px-5 py-2">
-            <span class="w-2 h-2 rounded-full bg-brand-gold pulse-glow"></span>
-            {{ eventStore.activeEvent.edition }} · Registration Open
+          <div class="inline-flex items-center gap-2 px-5 py-2 text-xs font-bold uppercase tracking-[0.2em]"
+            :class="eventStore.isPastEvent
+              ? 'bg-gray-500/15 border border-gray-400/40 text-gray-300'
+              : 'bg-brand-gold/15 border border-brand-gold/40 text-brand-gold'">
+            <span class="w-2 h-2 rounded-full" :class="eventStore.isPastEvent ? 'bg-gray-400' : 'bg-brand-gold pulse-glow'"></span>
+            {{ eventStore.activeEvent.edition }} · {{ eventStore.isPastEvent ? 'Event Closed' : 'Registration Open' }}
           </div>
         </div>
 
@@ -124,7 +126,7 @@
         </div>
 
         <!-- Countdown -->
-        <div v-if="eventStore.hasActiveEvent"
+        <div v-if="eventStore.isRegistrationOpen"
           :class="heroStep>=5?'opacity-100 translate-y-0':'opacity-0 translate-y-4'"
           style="transition:all 0.6s ease 0.2s">
           <p class="text-white/30 text-xs uppercase tracking-[0.25em] mb-3">Event Countdown</p>
@@ -297,7 +299,7 @@
     </section>
 
     <!-- ── TICKETS ───────────────────────────────────────── -->
-    <section v-if="eventStore.hasActiveEvent" id="tickets"
+    <section v-if="eventStore.isRegistrationOpen" id="tickets"
       class="py-16 md:py-24 bg-brand-green geometric-bg relative overflow-hidden">
       <div class="absolute inset-0 bg-gradient-to-br from-brand-green via-brand-green to-[#013a24]"></div>
       <div class="relative max-w-7xl mx-auto px-4 md:px-6">

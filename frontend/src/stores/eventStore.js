@@ -11,6 +11,10 @@ export const useEventStore = defineStore('event', () => {
   const loadingPast    = ref(false);
 
   const hasActiveEvent = computed(() => !!activeEvent.value);
+  // True when we're showing a completed event as a fallback (no live event)
+  const isPastEvent    = computed(() => !!activeEvent.value?.is_past);
+  // Registration only open for a genuinely active (not past) event
+  const isRegistrationOpen = computed(() => !!activeEvent.value && !activeEvent.value.is_past);
 
   /* ─── Public fetch: active event ──────────────────────── */
   const fetchActiveEvent = async () => {
@@ -70,6 +74,8 @@ export const useEventStore = defineStore('event', () => {
     loadingActive,
     loadingPast,
     hasActiveEvent,
+    isPastEvent,
+    isRegistrationOpen,
     fetchActiveEvent,
     fetchPastEvents,
     fetchTicketTypes,
