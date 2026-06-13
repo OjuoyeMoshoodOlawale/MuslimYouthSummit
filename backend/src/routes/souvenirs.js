@@ -3,6 +3,7 @@ import { authenticate, authorize } from '../middleware/auth.js';
 import { query } from '../database/db.js';
 import { success, created, error, notFound } from '../utils/response.js';
 import { initializeTransaction, verifyTransaction } from '../services/paystackService.js';
+import { grossUpForPaystack } from '../utils/paystackFees.js';
 
 const router = express.Router();
 const adm    = [authenticate, authorize('super_admin', 'admin')];
