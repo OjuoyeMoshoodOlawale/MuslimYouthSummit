@@ -164,7 +164,7 @@
               </div>
               <button class="w-full py-3 bg-gray-200 text-gray-700 font-bold rounded hover:bg-red-100 hover:text-red-700 transition-colors"
                 :disabled="checkingOut" @click="doCheckOut">
-                {{ checkingOut ? 'Processing…' : '🚪 Check Out' }}
+                {{ checkingOut ? 'Processing…' : 'Check Out' }}
               </button>
             </div>
 

@@ -34,7 +34,7 @@ const alertClass = (type) => ({
   info:    'border-blue-500',
 }[type] ?? 'border-gray-400');
 
-const icon = (type) => ({ success:'✅', error:'❌', warning:'⚠️', info:'ℹ️' }[type] ?? '•');
+const icon = (type) => ({ success:'success', error:'error', warning:'⚠️', info:'ℹ️' }[type] ?? '•');
 </script>
 
 <style scoped>

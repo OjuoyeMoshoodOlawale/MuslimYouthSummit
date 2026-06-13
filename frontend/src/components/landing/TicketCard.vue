@@ -2,7 +2,7 @@
   <div class="relative flex flex-col" :class="featured ? 'ring-2 ring-brand-gold shadow-2xl scale-[1.02]' : 'border border-gray-200 shadow-sm'">
     <!-- featured ribbon -->
     <div v-if="featured" class="bg-brand-gold text-brand-green text-xs font-bold uppercase tracking-widest text-center py-2">
-      ⭐ Most Popular
+       Most Popular
     </div>
 
     <div class="bg-white flex flex-col flex-1 p-8">
