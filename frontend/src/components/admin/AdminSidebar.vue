@@ -20,13 +20,14 @@
           {{ section.label }}
         </p>
         <RouterLink v-for="link in section.links" :key="link.to" :to="link.to"
-          class="flex items-center gap-3 px-3 py-2.5 transition-all duration-150 text-sm group"
+          class="flex items-center gap-3 px-3 py-2.5 transition-all duration-150 text-sm group rounded-lg"
           :class="[
             isActive(link.to) ? 'bg-brand-gold text-brand-green font-bold' : 'text-white/65 hover:text-white hover:bg-white/10',
             collapsed ? 'justify-center' : ''
           ]"
-          :title="collapsed ? link.label : ''">
-          <component :is="link.icon" :size="17" class="flex-shrink-0" />
+          :title="collapsed ? link.label : ''"
+          @click="$emit('navigate')">
+          <component :is="link.icon" :size="18" class="flex-shrink-0" />
           <span v-if="!collapsed" class="truncate">{{ link.label }}</span>
         </RouterLink>
       </template>
@@ -34,12 +35,12 @@
 
     <!-- Bottom controls -->
     <div class="flex-shrink-0 border-t border-white/10 p-2 space-y-0.5">
-      <button class="w-full flex items-center gap-3 px-3 py-2.5 text-white/40 hover:text-white hover:bg-white/10 text-sm transition-colors"
+      <button class="hidden lg:flex w-full items-center gap-3 px-3 py-2.5 text-white/40 hover:text-white hover:bg-white/10 text-sm transition-colors rounded-lg"
         :class="collapsed ? 'justify-center' : ''" @click="$emit('toggle')">
         <component :is="collapsed ? ChevronRight : ChevronLeft" :size="17" />
         <span v-if="!collapsed" class="text-xs">Collapse</span>
       </button>
-      <button class="w-full flex items-center gap-3 px-3 py-2.5 text-white/40 hover:text-red-300 hover:bg-white/10 text-sm transition-colors"
+      <button class="w-full flex items-center gap-3 px-3 py-2.5 text-white/40 hover:text-red-300 hover:bg-white/10 text-sm transition-colors rounded-lg"
         :class="collapsed ? 'justify-center' : ''" @click="handleLogout">
         <LogOut :size="17" />
         <span v-if="!collapsed" class="text-xs">Logout</span>
@@ -64,7 +65,7 @@ const SUPER_ONLY = ['super_admin'];
 const DEPT_PLUS  = ['super_admin','admin','department'];
 
 defineProps({ collapsed: { type: Boolean, default: false } });
-defineEmits(['toggle']);
+defineEmits(['toggle', 'navigate']);
 
 const auth   = useAuthStore();
 const router = useRouter();
