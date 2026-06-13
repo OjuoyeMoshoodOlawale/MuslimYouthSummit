@@ -202,10 +202,10 @@ export const verifyTicketPayment = async (req, res, next) => {
 
     const updatedTicket = { ...ticket, status: 'paid', qr_code_svg: qrSvg };
 
-    // Send ticket email (non-blocking)
-    sendTicketEmail(updatedTicket).then(() => {
-      // email sent
-    }).catch(console.error);
+    // Send ticket email (non-blocking — never delays the response)
+    sendTicketEmail(updatedTicket)
+      .then(() => console.log(`✅ Ticket email sent → ${updatedTicket.participant_email}`))
+      .catch((err) => console.error(`❌ Ticket email failed for ${updatedTicket.participant_email}:`, err.message));
 
     // Return enriched ticket (same shape as getTicket)
     const [enriched] = await query(

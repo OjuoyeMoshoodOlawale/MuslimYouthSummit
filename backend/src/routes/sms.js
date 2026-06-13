@@ -140,3 +140,4 @@ router.get('/sms/status', ...adm, async (req, res, next) => {
 });
 
 export default router;
+// file appended below existing SMS routes — this is intentional
