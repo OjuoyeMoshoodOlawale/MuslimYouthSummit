@@ -10,7 +10,7 @@ export const generateQRCodeSVG = async (data) => {
     type: 'svg',
     color: {
       dark: '#02462E',
-      light: '#FBF6E6',
+      light: '#FFFFFF',
     },
     width: 300,
     margin: 1,

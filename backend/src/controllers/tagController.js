@@ -131,6 +131,17 @@ export const getPrintableTags = async (req, res, next) => {
       return res.send('<html><body style="font-family:sans-serif;padding:40px"><h2>No tags found.</h2><p>Generate tags first.</p></body></html>');
     }
 
+    // Safety net: if any tag is missing its QR (created before QR was wired,
+    // or qrcode pkg failed at creation), generate it now and persist it.
+    for (const tag of tags) {
+      if (!tag.qr_code_svg) {
+        try {
+          tag.qr_code_svg = await generateQRCodeSVG(tagQRData(tag.tag_number, eventId));
+          query('UPDATE event_tags SET qr_code_svg = ? WHERE id = ?', [tag.qr_code_svg, tag.id]).catch(() => {});
+        } catch { /* qrcode pkg missing — fallback shows tag number */ }
+      }
+    }
+
     const FRONTEND = process.env.FRONTEND_URL || 'http://localhost:5173';
     const logoUrl  = `${FRONTEND}/logos/logo-white.png`;
 
