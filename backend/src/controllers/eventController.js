@@ -292,10 +292,42 @@ export const changeEventStatus = async (req, res, next) => {
 
     await query('UPDATE events SET status = ?, updated_at = NOW() WHERE id = ?', [status, id]);
 
+    // When an event is COMPLETED, email a certificate to every checked-in participant
+    if (status === 'completed' && existing[0].status !== 'completed') {
+      try {
+        const [attendees] = await query(
+          `SELECT DISTINCT p.name, p.email, t.unique_number, e.title AS event_title
+           FROM attendance a
+           JOIN tickets t      ON t.id = a.ticket_id
+           JOIN participants p ON p.id = t.participant_id
+           JOIN events e       ON e.id = t.event_id
+           WHERE t.event_id = ? AND a.checked_in_at IS NOT NULL AND p.email IS NOT NULL`,
+          [id]
+        );
+        if (attendees.length) {
+          const { sendCertificateEmail } = await import('../services/emailService.js');
+          console.log(`  [Cert] Sending ${attendees.length} certificates for event ${id}…`);
+          // Send sequentially with small delay to respect SMTP rate limits
+          (async () => {
+            for (const a of attendees) {
+              try {
+                await sendCertificateEmail({
+                  to: a.email, name: a.name,
+                  eventTitle: a.event_title, uniqueNumber: a.unique_number,
+                });
+              } catch (e) { console.error(`  [Cert] Failed for ${a.email}: ${e.message}`); }
+              await new Promise(r => setTimeout(r, 200));
+            }
+            console.log(`  [Cert] Certificate batch complete.`);
+          })();
+        }
+      } catch (e) { console.error(`  [Cert] Batch error: ${e.message}`); }
+    }
+
     const messages = {
-      active: '🟢 Event is now LIVE and visible on the landing page!',
+      active: 'Event is now LIVE and visible on the landing page!',
       draft: 'Event moved back to draft.',
-      completed: 'Event marked as completed and archived.',
+      completed: 'Event marked as completed. Certificates are being emailed to all attendees.',
       cancelled: 'Event has been cancelled.',
     };
 

@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/authStore.js';
 const Landing             = () => import('@/views/Landing.vue');
 const RegisterTicket      = () => import('@/views/RegisterTicket.vue');
 const TicketView          = () => import('@/views/TicketView.vue');
+const CertificateView     = () => import('@/views/CertificateView.vue');
 const CheckIn             = () => import('@/views/CheckIn.vue');
 const PastEvents          = () => import('@/views/PastEvents.vue');
 
@@ -45,7 +46,10 @@ const routes = [
   /* Public ──────────────────────────────────────────────── */
   { path: '/',             name: 'home',     component: Landing },
   { path: '/register',     name: 'register', component: RegisterTicket },
+  { path: '/ticket/verify', name: 'ticket-verify', component: TicketView },
   { path: '/ticket/:ref',  name: 'ticket',   component: TicketView },
+  { path: '/certificate',  name: 'certificate', component: CertificateView },
+  { path: '/certificate/:ref', name: 'certificate-ref', component: CertificateView },
   { path: '/check-in',     name: 'checkin',  component: CheckIn,
     meta: { requiresAuth: true, roles: ALL_ADMIN } },
   { path: '/past-events',  name: 'past',     component: PastEvents },
