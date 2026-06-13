@@ -103,14 +103,12 @@ export const getPrintableTags = async (req, res, next) => {
     const { eventId } = req.params;
     const { ids, unassigned_only } = req.query;
 
-    // Get event info
     const [[event]] = await query(
       'SELECT title, edition, start_date, end_date, venue FROM events WHERE id = ?',
       [eventId]
     );
     if (!event) return notFoundRes(res, 'Event');
 
-    // Build WHERE clause
     let where = 'WHERE t.event_id = ?';
     const params = [eventId];
     if (ids) {
@@ -120,13 +118,8 @@ export const getPrintableTags = async (req, res, next) => {
     if (unassigned_only === '1') where += ' AND t.ticket_id IS NULL';
 
     const [tags] = await query(
-      `SELECT t.id, t.tag_number, t.qr_code_svg, t.is_printed,
-              p.name AS participant_name, p.gender,
-              c.name AS category_name, c.color AS category_color
+      `SELECT t.id, t.tag_number, t.qr_code_svg
        FROM event_tags t
-       LEFT JOIN participants p  ON p.id  = t.participant_id
-       LEFT JOIN tickets tk      ON tk.id = t.ticket_id
-       LEFT JOIN event_categories c ON c.id = tk.category_id
        ${where}
        ORDER BY t.tag_number
        LIMIT 500`,
@@ -135,44 +128,37 @@ export const getPrintableTags = async (req, res, next) => {
 
     if (!tags.length) {
       res.setHeader('Content-Type', 'text/html');
-      return res.send('<html><body style="font-family:sans-serif;padding:40px"><h2>No tags found.</h2></body></html>');
+      return res.send('<html><body style="font-family:sans-serif;padding:40px"><h2>No tags found.</h2><p>Generate tags first.</p></body></html>');
     }
 
-    const fmtDate = (d) => {
-      if (!d) return '';
-      try { return new Date(d).toLocaleDateString('en-NG',{day:'numeric',month:'short',year:'numeric'}); }
-      catch { return String(d).slice(0,10); }
-    };
-    const eventDate = fmtDate(event.start_date);
+    const FRONTEND = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const logoUrl  = `${FRONTEND}/logos/logo-white.png`;
 
-    // Build tag cards HTML
+    // ── Single tag card: logo + event + BIG number + QR only ──
     const tagCard = (tag) => `
-      <div class="tag-card${tag.ticket_id ? '' : ' unassigned'}">
-        <div class="tag-top-stripe" style="background:${tag.category_color || '#02462E'}"></div>
-        <div class="tag-header">
-          <div class="tag-event-name">${event.title}</div>
-          <div class="tag-edition">${event.edition}</div>
-        </div>
-        <div class="tag-body">
-          <div class="tag-left">
-            <div class="tag-name">${tag.participant_name || 'UNASSIGNED'}</div>
-            <div class="tag-number">${tag.tag_number}</div>
-            ${tag.category_name
-              ? `<div class="tag-category" style="background:${tag.category_color || '#02462E'}22;color:${tag.category_color || '#02462E'};border:1px solid ${tag.category_color || '#02462E'}50">${tag.category_name}</div>`
-              : '<div class="tag-category-empty">Assign at gate</div>'}
-            <div class="tag-event-date">${eventDate}${event.venue ? ' · ' + event.venue.split(',')[0] : ''}</div>
+      <div class="tag">
+        <div class="tag-stripe"></div>
+        <div class="tag-head">
+          <img src="${logoUrl}" alt="MYS" class="tag-logo" />
+          <div class="tag-evt">
+            <div class="tag-evt-name">${event.title}</div>
+            <div class="tag-evt-ed">${event.edition}</div>
           </div>
+        </div>
+        <div class="tag-mid">
           <div class="tag-qr">
-            ${tag.qr_code_svg || `<div style="width:90px;height:90px;border:2px dashed #ccc;display:flex;align-items:center;justify-content:center;font-size:10px;color:#999">${tag.tag_number}</div>`}
+            ${tag.qr_code_svg || `<div class="qr-fallback">${tag.tag_number}</div>`}
           </div>
+          <div class="tag-num-label">TAG NUMBER</div>
+          <div class="tag-num">${tag.tag_number}</div>
+          <div class="tag-scan">Scan to check in &amp; view attendee</div>
         </div>
+        <div class="tag-foot">muslimyouthsummit.com</div>
       </div>`;
 
-    // Chunk tags into groups of 4 (2×2 per page)
+    // Chunk into pages of 4 (2×2)
     const pages = [];
-    for (let i = 0; i < tags.length; i += 4) {
-      pages.push(tags.slice(i, i + 4));
-    }
+    for (let i = 0; i < tags.length; i += 4) pages.push(tags.slice(i, i + 4));
 
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -181,242 +167,122 @@ export const getPrintableTags = async (req, res, next) => {
   <title>Event Tags — ${event.title} ${event.edition}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;600;700&display=swap');
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'DM Sans', sans-serif; background: #f5f5f5; }
+    body { font-family: 'DM Sans', sans-serif; background: #e8e8e8; }
 
-    /* ── Print page setup ── */
-    @page {
-      size: A4 portrait;
-      margin: 8mm;
-    }
+    @page { size: A4 portrait; margin: 8mm; }
 
-    .print-page {
-      width: 210mm;
-      min-height: 297mm;
-      background: white;
-      margin: 0 auto 20px;
-      padding: 8mm;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      grid-template-rows: 1fr 1fr;
-      gap: 0;
-      page-break-after: always;
+    .toolbar {
+      position: sticky; top: 0; background: #02462E; color: #fff;
+      padding: 12px 20px; display: flex; align-items: center; justify-content: space-between;
+      z-index: 10;
     }
+    .toolbar h1 { font-family:'Syne',sans-serif; font-size: 15px; }
+    .toolbar button {
+      background: #FEC700; color: #02462E; border: 0; font-weight: 700;
+      padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: 13px;
+    }
+    .toolbar .count { font-size: 12px; opacity: .7; }
 
-    /* ── Cut line cell ── */
-    .tag-cell {
-      position: relative;
-      padding: 4mm;
+    .page {
+      width: 210mm; min-height: 297mm; background: #fff;
+      margin: 16px auto; padding: 8mm;
+      display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+      gap: 0; page-break-after: always;
     }
-    /* Horizontal cut line between rows */
-    .tag-cell:nth-child(1),
-    .tag-cell:nth-child(2) {
-      border-bottom: 1.5px dashed #bbb;
+    .cell { position: relative; padding: 5mm; }
+    .cell:nth-child(1), .cell:nth-child(2) { border-bottom: 1.5px dashed #c5c5c5; }
+    .cell:nth-child(odd) { border-right: 1.5px dashed #c5c5c5; }
+    .cell::after {
+      content: '✂'; position: absolute; font-size: 13px; color: #ccc; line-height: 1;
     }
-    /* Vertical cut line between columns */
-    .tag-cell:nth-child(odd) {
-      border-right: 1.5px dashed #bbb;
-    }
+    .cell:nth-child(1)::after { bottom: -10px; right: -7px; }
+    .cell:nth-child(2)::after { bottom: -10px; left: -7px; }
 
-    /* Cut corner markers */
-    .tag-cell::before,
-    .tag-cell::after {
-      content: '✂';
-      position: absolute;
-      font-size: 12px;
-      color: #ccc;
-      line-height: 1;
+    /* ── The tag itself ── */
+    .tag {
+      width: 100%; height: 100%; min-height: 122mm;
+      border: 2px solid #02462E; border-radius: 4px;
+      background: #fff; display: flex; flex-direction: column;
+      overflow: hidden; position: relative;
     }
-    .tag-cell:nth-child(1)::before  { top:  -10px; right: -8px; transform: rotate(180deg); }
-    .tag-cell:nth-child(2)::before  { top:  -10px; left:  -8px; }
-    .tag-cell:nth-child(1)::after   { bottom: -10px; right: -8px; transform: rotate(90deg); }
-    .tag-cell:nth-child(2)::after   { bottom: -10px; left:  -8px; transform: rotate(270deg); }
+    .tag-stripe { height: 8px; background: #FEC700; flex-shrink: 0; }
 
-    /* ── Tag card design ── */
-    .tag-card {
-      width: 100%;
-      height: 100%;
-      border: 1.5px solid #02462E;
-      background: #FBF6E6;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      min-height: 120mm;
+    .tag-head {
+      background: #02462E; color: #fff; padding: 12px 16px;
+      display: flex; align-items: center; gap: 12px; flex-shrink: 0;
     }
-    .tag-card.unassigned {
-      border-color: #ccc;
-      background: #fafafa;
-      opacity: 0.7;
+    .tag-logo { height: 34px; width: auto; flex-shrink: 0; }
+    .tag-evt-name {
+      font-family:'Syne',sans-serif; font-weight: 800; font-size: 14px;
+      line-height: 1.1; letter-spacing: -0.3px;
+    }
+    .tag-evt-ed {
+      font-size: 10px; font-weight: 700; color: #FEC700;
+      letter-spacing: 0.15em; margin-top: 2px;
     }
 
-    .tag-top-stripe {
-      height: 6px;
-      flex-shrink: 0;
+    .tag-mid {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 6px;
+      padding: 14px;
     }
-
-    .tag-header {
-      background: #02462E;
-      color: white;
-      padding: 6px 10px 4px;
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      flex-shrink: 0;
-    }
-    .tag-event-name {
-      font-family: 'Syne', sans-serif;
-      font-weight: 800;
-      font-size: 11px;
-      letter-spacing: -0.3px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .tag-edition {
-      font-size: 9px;
-      font-weight: 700;
-      color: #FEC700;
-      letter-spacing: 0.1em;
-      flex-shrink: 0;
-      margin-left: 8px;
-    }
-
-    .tag-body {
-      flex: 1;
-      padding: 8px 10px;
-      display: flex;
-      gap: 8px;
-      align-items: flex-start;
-    }
-
-    .tag-left {
-      flex: 1;
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .tag-name {
-      font-family: 'Syne', sans-serif;
-      font-weight: 800;
-      font-size: 15px;
-      color: #02462E;
-      line-height: 1.15;
-      word-break: break-word;
-    }
-
-    .tag-number {
-      font-family: 'Courier New', monospace;
-      font-weight: bold;
-      font-size: 13px;
-      color: #555;
-      letter-spacing: 0.1em;
-      background: white;
-      border: 1px solid #ddd;
-      padding: 2px 6px;
-      display: inline-block;
-      margin-top: 2px;
-    }
-
-    .tag-category {
-      font-size: 9px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.15em;
-      padding: 2px 8px;
-      border-radius: 2px;
-      display: inline-block;
-      margin-top: 2px;
-    }
-    .tag-category-empty {
-      font-size: 9px;
-      color: #aaa;
-      font-style: italic;
-      margin-top: 2px;
-    }
-
-    .tag-event-date {
-      font-size: 9px;
-      color: #888;
-      margin-top: auto;
-      padding-top: 6px;
-    }
-
     .tag-qr {
-      flex-shrink: 0;
-      width: 90px;
+      width: 150px; height: 150px; padding: 8px;
+      border: 2px solid #02462E22; border-radius: 8px; background: #fff;
+      display: flex; align-items: center; justify-content: center;
     }
-    .tag-qr svg {
-      width: 90px !important;
-      height: 90px !important;
+    .tag-qr svg { width: 100%; height: 100%; }
+    .qr-fallback {
+      width: 100%; height: 100%; border: 2px dashed #ccc; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; color: #999; font-family: monospace;
     }
+    .tag-num-label {
+      font-size: 9px; font-weight: 700; letter-spacing: 0.3em;
+      color: #999; text-transform: uppercase; margin-top: 8px;
+    }
+    .tag-num {
+      font-family:'Syne',sans-serif; font-weight: 800; font-size: 30px;
+      color: #02462E; letter-spacing: 1px; line-height: 1;
+    }
+    .tag-scan { font-size: 9px; color: #aaa; margin-top: 2px; }
 
-    /* ── Instructions bar ── */
-    .tag-footer {
-      background: #02462E;
-      color: rgba(255,255,255,0.5);
-      font-size: 8px;
-      padding: 3px 10px;
-      text-align: center;
-      letter-spacing: 0.1em;
+    .tag-foot {
+      background: #FBF6E6; color: #02462E; text-align: center;
+      font-size: 9px; font-weight: 600; padding: 6px; letter-spacing: 0.05em;
+      flex-shrink: 0; border-top: 1px solid #02462E15;
     }
-
-    /* ── Screen-only ── */
-    .no-print {
-      text-align: center;
-      padding: 24px;
-      font-family: 'DM Sans', sans-serif;
-    }
-    .btn-print {
-      background: #02462E; color: white; border: none;
-      padding: 12px 32px; font-size: 16px; font-weight: 700;
-      cursor: pointer; margin: 0 8px;
-    }
-    .btn-print:hover { background: #013a24; }
-    .stats { color: #666; font-size: 14px; margin-bottom: 16px; }
 
     @media print {
-      body { background: white; }
-      .no-print { display: none !important; }
-      .print-page { margin: 0; width: 100%; }
+      .toolbar { display: none; }
+      body { background: #fff; }
+      .page { margin: 0; box-shadow: none; }
     }
   </style>
 </head>
 <body>
+  <div class="toolbar">
+    <h1>${event.title} ${event.edition} — Event Tags</h1>
+    <span class="count">${tags.length} tag${tags.length>1?'s':''} · 4 per A4 page</span>
+    <button onclick="window.print()">Print / Save PDF</button>
+  </div>
 
-<div class="no-print">
-  <p class="stats">
-    <strong>${event.title} ${event.edition}</strong> — ${tags.length} tag${tags.length===1?'':'s'}
-    · ${Math.ceil(tags.length/4)} page${Math.ceil(tags.length/4)===1?'':'s'}
-  </p>
-  <button class="btn-print" onclick="window.print()">🖨️ Print Tags</button>
-  <button class="btn-print" style="background:#555" onclick="window.close()">✕ Close</button>
-  <p style="color:#aaa;font-size:12px;margin-top:12px">
-    4 tags per A4 page · Cut along dashed lines after printing
-  </p>
-</div>
-
-${pages.map(page => `
-<div class="print-page">
-  ${page.map(tag => `
-  <div class="tag-cell">
-    ${tagCard(tag)}
-  </div>`).join('')}
-  ${page.length < 4 ? Array(4 - page.length).fill('<div class="tag-cell"><div class="tag-card" style="opacity:0.1;border-style:dashed"></div></div>').join('') : ''}
-</div>`).join('')}
-
+  ${pages.map(pageTags => `
+    <div class="page">
+      ${pageTags.map(t => `<div class="cell">${tagCard(t)}</div>`).join('')}
+      ${Array(4 - pageTags.length).fill('<div class="cell"></div>').join('')}
+    </div>`).join('')}
 </body>
 </html>`;
 
-    // Mark printed
-    const tagIds = tags.map(t => t.id);
-    if (tagIds.length) {
-      await query(`UPDATE event_tags SET is_printed=1 WHERE id IN (${tagIds.map(()=>'?').join(',')})`, tagIds);
-    }
-
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Content-Type', 'text/html');
     res.send(html);
+
+    // Mark as printed (best-effort)
+    const printedIds = tags.map(t => t.id);
+    if (printedIds.length) {
+      query(`UPDATE event_tags SET is_printed = 1 WHERE id IN (${printedIds.join(',')})`).catch(() => {});
+    }
   } catch (e) { next(e); }
 };
