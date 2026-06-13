@@ -2,8 +2,8 @@
   <div class="min-h-screen font-body">
 
     <!-- ── STICKY NAV ─────────────────────────────────────── -->
-    <nav class="fixed top-0 inset-x-0 z-50 transition-all duration-500"
-      :class="scrolled ? 'bg-brand-green/96 backdrop-blur-md shadow-lg' : 'bg-transparent'">
+    <nav class="fixed top-0 inset-x-0 z-50 transition-all duration-300"
+      :class="scrolled ? 'bg-brand-green shadow-lg' : 'bg-gradient-to-b from-black/40 to-transparent'">
       <div class="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-4">
         <button @click="scrollTo('top')">
           <img src="/logos/logo-white.png" alt="MYS" class="h-9" />
@@ -614,7 +614,7 @@ let stepTimers = [];
 
 onMounted(async () => {
   scrollHandler = () => {
-    scrolled.value = window.scrollY > 40;
+    scrolled.value = window.scrollY > 10;
     if (mobileMenuOpen.value && window.scrollY > 80) mobileMenuOpen.value = false;
   };
   window.addEventListener('scroll', scrollHandler, { passive: true });
