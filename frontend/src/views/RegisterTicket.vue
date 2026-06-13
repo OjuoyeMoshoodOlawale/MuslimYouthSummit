@@ -280,10 +280,26 @@ const openPaystackPopup = (authData) => {
     const loaded = await loadPaystackScript();
     if (!loaded || !window.PaystackPop) { reject(new Error('SCRIPT_FAILED')); return; }
 
+    // The server already initialised this transaction with Paystack (we have an
+    // access_code). RESUME it instead of calling setup() again — calling setup()
+    // with the same ref triggers "Duplicate Transaction Reference".
+    try {
+      if (authData.access_code && typeof window.PaystackPop === 'function') {
+        const popup = new window.PaystackPop();
+        popup.resumeTransaction(authData.access_code, {
+          onSuccess: (txn) => resolve(txn),
+          onCancel:  () => reject(new Error('CLOSED')),
+          onError:   () => reject(new Error('SCRIPT_FAILED')),
+        });
+        return;
+      }
+    } catch { /* fall through to legacy setup */ }
+
+    // Legacy fallback (older inline.js): setup with ref
     const handler = window.PaystackPop.setup({
       key:      publicKey,
       email:    form.email,
-      amount:   Math.round(Number(selectedPrice.value) * 100), // kobo
+      amount:   Math.round(Number(feeInfo.value.total) * 100), // kobo (incl. fee)
       ref:      authData.reference,
       currency: 'NGN',
       metadata: {
@@ -293,10 +309,7 @@ const openPaystackPopup = (authData) => {
         ],
       },
       onClose: () => reject(new Error('CLOSED')),
-      callback: (response) => {
-        // Payment confirmed by Paystack — now verify on our backend
-        resolve(response);
-      },
+      callback: (response) => resolve(response),
     });
     handler.openIframe();
   });
