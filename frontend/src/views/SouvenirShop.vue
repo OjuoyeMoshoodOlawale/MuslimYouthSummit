@@ -290,27 +290,16 @@ const submitOrder = async () => {
     });
     const { payment_url, reference } = data.data || {};
 
-    // Paystack inline popup if public key available
-    const pubKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
-    if (pubKey && window.PaystackPop) {
-      const handler = window.PaystackPop.setup({
-        key: pubKey, email: buyForm.buyer_email,
-        amount: Math.round(buyFees.value.total * 100),
-        ref: reference, currency: 'NGN',
-        onClose: () => { buyBusy.value=false; },
-        callback: () => {
-          buyModal.value=false;
-          showToast('Order confirmed! Check your email.');
-        },
-      });
-      handler.openIframe();
+    // PRIMARY: redirect to Paystack hosted checkout (no browser key needed,
+    // never throws "Please enter a valid Key", no duplicate-reference risk).
+    if (payment_url) {
+      window.location.href = payment_url;
       return;
     }
 
-    // Fallback: full page redirect
-    if (payment_url) { window.location.href = payment_url; return; }
+    // Fallback only if no payment_url returned
     buyModal.value = false;
-    showToast('Order placed! Redirecting to payment…');
+    showToast('Order placed! Check your email for payment details.');
   } catch (e) {
     buyErr.value = e.response?.data?.message || 'Order failed. Please try again.';
   } finally { buyBusy.value = false; }

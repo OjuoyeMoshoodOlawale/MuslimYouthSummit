@@ -56,6 +56,16 @@ export const initializeTransaction = async ({ email, amount, reference, metadata
     if (err.response?.status === 401) {
       throw new Error('Invalid Paystack secret key. Check your PAYSTACK_SECRET_KEY in backend/.env.');
     }
+    if (err.code === 'ENOTFOUND' || err.code === 'EAI_AGAIN') {
+      throw new Error('Cannot reach Paystack (api.paystack.co). Check the server\'s internet connection / DNS.');
+    }
+    if (err.code === 'ECONNABORTED') {
+      throw new Error('Paystack request timed out. Please try again.');
+    }
+    // Surface Paystack's own message if present (e.g. duplicate reference)
+    if (err.response?.data?.message) {
+      throw new Error(`Paystack: ${err.response.data.message}`);
+    }
     throw err;
   }
 };

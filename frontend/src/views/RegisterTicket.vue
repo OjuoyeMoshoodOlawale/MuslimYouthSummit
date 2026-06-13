@@ -275,7 +275,11 @@ const loadPaystackScript = () => new Promise((resolve) => {
 const openPaystackPopup = (authData) => {
   return new Promise(async (resolve, reject) => {
     const publicKey = authData.public_key || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
-    if (!publicKey) { reject(new Error('NO_KEY')); return; }
+    // Reject missing OR placeholder keys (pk_test_xxxx...) → these cause
+    // Paystack's "Please enter a valid Key" error
+    if (!publicKey || /^pk_(test|live)_x+$/i.test(publicKey) || !/^pk_(test|live)_/.test(publicKey)) {
+      reject(new Error('NO_KEY')); return;
+    }
 
     const loaded = await loadPaystackScript();
     if (!loaded || !window.PaystackPop) { reject(new Error('SCRIPT_FAILED')); return; }
