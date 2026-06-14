@@ -73,6 +73,7 @@ const adminChildren = [
   { path: 'expenses',            name: 'admin-expenses',        component: AdminExpenses,        meta: { roles: DEPT_PLUS } },
   { path: 'admins',              name: 'admin-admins',          component: AdminAdmins,          meta: { roles: SUPER_ONLY } },
   { path: 'settings',            name: 'admin-settings',        component: AdminSettings,        meta: { roles: ALL_ADMIN } },
+  { path: 'branding',            name: 'admin-branding',        component: AdminTenantBranding,  meta: { roles: SUPER_ONLY } },
   { path: 'souvenirs',           name: 'admin-souvenirs',       component: AdminSouvenirs,       meta: { roles: ADMIN_ONLY } },
   { path: 'sponsors',            name: 'admin-sponsors',        component: AdminSponsors,        meta: { roles: ADMIN_ONLY } },
   { path: 'media',               name: 'admin-media',           component: AdminMediaUpload,     meta: { roles: ALL_ADMIN } },
