@@ -1,4 +1,18 @@
 <template>
+    <!-- Order verification banner (after Paystack return) -->
+    <div v-if="verifying" class="fixed top-4 inset-x-4 z-50 max-w-md mx-auto bg-white border border-gray-200 shadow-xl rounded-xl p-4 flex items-center gap-3">
+      <Loader :size="18" class="animate-spin text-brand-green" />
+      <span class="text-sm text-gray-700">Confirming your payment…</span>
+    </div>
+    <div v-else-if="verifyResult" class="fixed top-4 inset-x-4 z-50 max-w-md mx-auto shadow-xl rounded-xl p-4 flex items-start gap-3"
+      :class="verifyResult.ok ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'">
+      <component :is="verifyResult.ok ? CheckCircle2 : AlertCircle" :size="18" :class="verifyResult.ok ? 'text-green-600' : 'text-red-500'" class="flex-shrink-0 mt-0.5" />
+      <div class="flex-1">
+        <p class="text-sm font-semibold" :class="verifyResult.ok ? 'text-green-800' : 'text-red-700'">{{ verifyResult.msg }}</p>
+        <button class="text-xs text-gray-400 mt-1 underline" @click="verifyResult=null">Dismiss</button>
+      </div>
+    </div>
+
   <div class="min-h-screen bg-brand-cream">
     <!-- Nav -->
     <nav class="bg-brand-green text-white px-4 md:px-6 py-4 flex items-center justify-between sticky top-0 z-40">
@@ -262,10 +276,28 @@ onMounted(async () => {
       if (sv) openBuy(sv);
     }
   }
+
+  // Returning from Paystack — verify the souvenir order
+  const ref = route.query.ref || route.query.reference || route.query.trxref;
+  if (ref) {
+    verifying.value = true;
+    try {
+      const { data } = await api.get(`/souvenirs/verify/${encodeURIComponent(ref)}`);
+      if (data.data?.status === 'paid' || data.success) {
+        verifyResult.value = { ok: true, msg: 'Payment confirmed! Your order is placed. Check your email for details.' };
+      } else {
+        verifyResult.value = { ok: false, msg: 'Payment not completed. If you were charged, contact support with your reference.' };
+      }
+    } catch (e) {
+      verifyResult.value = { ok: false, msg: e.response?.data?.message || 'Could not verify your order. Contact support if you were charged.' };
+    } finally { verifying.value = false; }
+  }
 });
 
 const fmtP = (n) => Number(n||0).toLocaleString('en-NG');
 
+const verifying    = ref(false);
+const verifyResult = ref(null);
 const showToast = (msg) => { toast.value=msg; setTimeout(()=>{toast.value='';},2500); };
 
 const openBuy = (sv) => {
