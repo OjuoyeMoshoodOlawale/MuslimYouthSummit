@@ -13,6 +13,7 @@
     "seed:admin": "node scripts/seed-admin.js",
     "setup:demo": "node scripts/setup-demo.js",
     "setup": "node scripts/setup-demo.js",
+    "setup:tenant": "node scripts/setup-tenant.js",
     "test:email": "node scripts/test-email.js"
   },
   "dependencies": {

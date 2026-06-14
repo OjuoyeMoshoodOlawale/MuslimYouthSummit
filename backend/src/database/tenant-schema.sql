@@ -111,4 +111,39 @@ CALL AddTenantColumn('ticket_types');
 
 DROP PROCEDURE IF EXISTS AddTenantColumn;
 
+-- ─────────────────────────────────────────────────────────────
+-- Admin email uniqueness must be PER TENANT (the same email can run admin
+-- accounts in different organisations). Drop the global unique on admins.email
+-- and add a composite (tenant_id, email) unique.
+-- ─────────────────────────────────────────────────────────────
+DELIMITER $$
+DROP PROCEDURE IF EXISTS FixAdminEmailUnique$$
+CREATE PROCEDURE FixAdminEmailUnique()
+BEGIN
+  DECLARE globalIdx VARCHAR(128) DEFAULT NULL;
+  -- Find a single-column unique index on admins.email
+  SELECT s.index_name INTO globalIdx
+    FROM information_schema.STATISTICS s
+    WHERE s.table_schema = DATABASE() AND s.table_name='admins'
+      AND s.column_name='email' AND s.non_unique=0
+      AND (SELECT COUNT(*) FROM information_schema.STATISTICS s2
+           WHERE s2.table_schema=DATABASE() AND s2.table_name='admins'
+             AND s2.index_name=s.index_name) = 1
+    LIMIT 1;
+  IF globalIdx IS NOT NULL THEN
+    SET @sql = CONCAT('ALTER TABLE admins DROP INDEX ', globalIdx);
+    PREPARE st FROM @sql; EXECUTE st; DEALLOCATE PREPARE st;
+  END IF;
+  -- Add composite unique if missing
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.STATISTICS
+    WHERE table_schema=DATABASE() AND table_name='admins' AND index_name='uq_admin_tenant_email'
+  ) THEN
+    ALTER TABLE admins ADD UNIQUE KEY uq_admin_tenant_email (tenant_id, email);
+  END IF;
+END$$
+DELIMITER ;
+CALL FixAdminEmailUnique();
+DROP PROCEDURE IF EXISTS FixAdminEmailUnique;
+
 SELECT 'Multi-tenant schema applied.' AS result;

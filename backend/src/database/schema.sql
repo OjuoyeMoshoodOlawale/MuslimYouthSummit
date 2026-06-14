@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS departments (
 CREATE TABLE IF NOT EXISTS admins (
   id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name            VARCHAR(120) NOT NULL,
-  email           VARCHAR(191) NOT NULL UNIQUE,
+  email           VARCHAR(191) NOT NULL,
   password        VARCHAR(255) NOT NULL,
   role            ENUM('super_admin','admin','attendant','department') NOT NULL DEFAULT 'admin',
   department_id   INT UNSIGNED NULL COMMENT 'Required when role=department',

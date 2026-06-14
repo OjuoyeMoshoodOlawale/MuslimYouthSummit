@@ -78,6 +78,30 @@ const run = async () => {
         console.log(`   + tenant_id on ${tbl}`);
       }
     }
+
+    // Admin email uniqueness → per tenant (drop global unique, add composite)
+    try {
+      const [idx] = await query(
+        `SELECT s.index_name FROM information_schema.STATISTICS s
+         WHERE s.table_schema=DATABASE() AND s.table_name='admins'
+           AND s.column_name='email' AND s.non_unique=0
+           AND (SELECT COUNT(*) FROM information_schema.STATISTICS s2
+                WHERE s2.table_schema=DATABASE() AND s2.table_name='admins'
+                  AND s2.index_name=s.index_name)=1 LIMIT 1`
+      );
+      if (idx.length) {
+        await query(`ALTER TABLE admins DROP INDEX ${idx[0].index_name}`);
+        console.log('   ↻ dropped global unique on admins.email');
+      }
+      const [comp] = await query(
+        `SELECT 1 FROM information_schema.STATISTICS WHERE table_schema=DATABASE()
+           AND table_name='admins' AND index_name='uq_admin_tenant_email' LIMIT 1`
+      );
+      if (!comp.length) {
+        await query('ALTER TABLE admins ADD UNIQUE KEY uq_admin_tenant_email (tenant_id, email)');
+        console.log('   + composite unique (tenant_id, email) on admins');
+      }
+    } catch (e) { console.log('   (admin email index:', e.message, ')'); }
   });
   console.log('✅ Tenant schema applied.\n');
 
