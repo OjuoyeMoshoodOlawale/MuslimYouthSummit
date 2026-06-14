@@ -31,6 +31,8 @@ import sponsorRoutes     from './routes/sponsors.js';
 import smsRoutes         from './routes/sms.js';
 import testRoutes        from './routes/test.js';
 import tagPrintRoutes    from './routes/tagPrint.js';
+import tenantRoutes      from './routes/tenant.js';
+import platformRoutes    from './routes/platform.js';
 import { cloneEvent }    from './controllers/cloneController.js';
 import { authenticate, authorize } from './middleware/auth.js';
 
@@ -129,6 +131,8 @@ app.use('/api', sponsorRoutes);
 app.use('/api', smsRoutes);
 app.use('/api', testRoutes);
 app.use('/api', tagPrintRoutes);
+app.use('/api', tenantRoutes);
+app.use('/api', platformRoutes);
 app.post('/api/events/clone', authenticate, authorize('super_admin','admin'), cloneEvent);
 
 // Facilitator reminders
