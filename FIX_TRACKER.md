@@ -82,10 +82,14 @@ DONE this session:
   with MYS defaults → whole app re-themes per tenant
 
 REMAINING (large, deliberate work — next sessions):
-- [ ] Router: /:slug, /:slug/admin, /:slug/register … + guard that loads tenant
-- [ ] Scope every controller query by req.tenant.id (events, participants,
-      tickets, tags, etc.) — the biggest piece, done incrementally per controller
+- [x] Router: /:slug, /:slug/admin, /:slug/register … + guard that loads tenant ✅
+- [x] Platform views: PlatformHome (tenant picker), PlatformLogin, PlatformDashboard
+      (create/list/suspend tenants), TenantPage (custom page renderer) ✅
+- [ ] ⚠️ NEXT CRITICAL: update hardcoded links in all components to include the
+      slug (e.g. RouterLink to="/admin/dashboard" → `/${slug}/admin/dashboard`).
+      Until done, in-app navigation will break under slug routing. Use a
+      useTenantLink() helper or inject slug from route.params.
+- [ ] Scope every controller query by req.tenant.id (events, participants, etc.)
 - [ ] Tenant admin: branding/colours/logo + custom pages UI in Settings
-- [ ] Platform admin dashboard: create/list/suspend tenants
 - [ ] Public branded landing per tenant (consume tenantStore)
 - [ ] Per-tenant Paystack wired into initiate (use resolvePaystackKeys)

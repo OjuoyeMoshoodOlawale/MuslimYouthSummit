@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore.js';
+import { useTenantStore } from '@/stores/tenantStore.js';
 
 /* ─── Lazy views ─────────────────────────────────────────── */
 const Landing             = () => import('@/views/Landing.vue');
@@ -9,6 +10,8 @@ const CertificateView     = () => import('@/views/CertificateView.vue');
 const TagView             = () => import('@/views/TagView.vue');
 const CheckIn             = () => import('@/views/CheckIn.vue');
 const PastEvents          = () => import('@/views/PastEvents.vue');
+const Souvenirs           = () => import('@/views/SouvenirShop.vue');
+const TenantPage          = () => import('@/views/TenantPage.vue');
 
 const AdminLogin          = () => import('@/views/admin/AdminLogin.vue');
 const AdminLayout         = () => import('@/views/admin/AdminLayout.vue');
@@ -35,7 +38,10 @@ const AdminSettings       = () => import('@/views/admin/AdminSettings.vue');
 const AdminSouvenirs      = () => import('@/views/admin/AdminSouvenirs.vue');
 const AdminSponsors       = () => import('@/views/admin/AdminSponsors.vue');
 const AdminMediaUpload    = () => import('@/views/admin/AdminMediaUpload.vue');
-const Souvenirs           = () => import('@/views/SouvenirShop.vue');
+
+const PlatformLogin       = () => import('@/views/platform/PlatformLogin.vue');
+const PlatformDashboard   = () => import('@/views/platform/PlatformDashboard.vue');
+const PlatformHome        = () => import('@/views/platform/PlatformHome.vue');
 
 /* ─── Roles shorthand ────────────────────────────────────── */
 const ALL_ADMIN  = ['super_admin','admin','attendant','department'];
@@ -43,98 +49,66 @@ const ADMIN_ONLY = ['super_admin','admin'];
 const SUPER_ONLY = ['super_admin'];
 const DEPT_PLUS  = ['super_admin','admin','department'];
 
+/* ─── Tenant-scoped admin children ───────────────────────── */
+const adminChildren = [
+  { path: '',                    redirect: to => `/${to.params.slug}/admin/dashboard` },
+  { path: 'dashboard',           name: 'admin-dashboard',       component: AdminDashboard,       meta: { roles: ALL_ADMIN } },
+  { path: 'event-dashboard',     name: 'admin-event-dashboard', component: AdminEventDashboard,  meta: { roles: ADMIN_ONLY } },
+  { path: 'reports',             name: 'admin-reports',         component: AdminReports,         meta: { roles: ADMIN_ONLY } },
+  { path: 'events',              name: 'admin-events',          component: AdminEvents,          meta: { roles: ADMIN_ONLY } },
+  { path: 'events/new',          name: 'admin-event-create',    component: CreateEvent,          meta: { roles: ADMIN_ONLY } },
+  { path: 'events/:id',          name: 'admin-event-detail',    component: EventDetail,          meta: { roles: ADMIN_ONLY } },
+  { path: 'events/:id/schedule', name: 'admin-schedule',        component: AdminSchedule,        meta: { roles: ADMIN_ONLY } },
+  { path: 'events/:id/ticket-types', name: 'admin-ticket-types', component: AdminTicketTypes,    meta: { roles: ADMIN_ONLY } },
+  { path: 'categories',          name: 'admin-categories',      component: AdminCategories,      meta: { roles: ADMIN_ONLY } },
+  { path: 'attendance',          name: 'admin-attendance',      component: AdminAttendance,      meta: { roles: ALL_ADMIN } },
+  { path: 'tags',                name: 'admin-tags',            component: AdminTags,            meta: { roles: ADMIN_ONLY } },
+  { path: 'hostels',             name: 'admin-hostels',         component: AdminHostels,         meta: { roles: ADMIN_ONLY } },
+  { path: 'gallery',             name: 'admin-gallery',         component: AdminGallery,         meta: { roles: ADMIN_ONLY } },
+  { path: 'participants',        name: 'admin-participants',    component: AdminParticipants,    meta: { roles: ADMIN_ONLY } },
+  { path: 'register',            name: 'admin-manual-register', component: AdminManualRegister,  meta: { roles: ADMIN_ONLY } },
+  { path: 'email',               name: 'admin-email',           component: AdminEmail,           meta: { roles: ADMIN_ONLY } },
+  { path: 'departments',         name: 'admin-departments',     component: AdminDepartments,     meta: { roles: ADMIN_ONLY } },
+  { path: 'expenses',            name: 'admin-expenses',        component: AdminExpenses,        meta: { roles: DEPT_PLUS } },
+  { path: 'admins',              name: 'admin-admins',          component: AdminAdmins,          meta: { roles: SUPER_ONLY } },
+  { path: 'settings',            name: 'admin-settings',        component: AdminSettings,        meta: { roles: ALL_ADMIN } },
+  { path: 'souvenirs',           name: 'admin-souvenirs',       component: AdminSouvenirs,       meta: { roles: ADMIN_ONLY } },
+  { path: 'sponsors',            name: 'admin-sponsors',        component: AdminSponsors,        meta: { roles: ADMIN_ONLY } },
+  { path: 'media',               name: 'admin-media',           component: AdminMediaUpload,     meta: { roles: ALL_ADMIN } },
+];
+
 const routes = [
-  /* Public ──────────────────────────────────────────────── */
-  { path: '/',             name: 'home',     component: Landing },
-  { path: '/register',     name: 'register', component: RegisterTicket },
-  { path: '/ticket/verify', name: 'ticket-verify', component: TicketView },
-  { path: '/ticket/:ref',  name: 'ticket',   component: TicketView },
-  { path: '/certificate',  name: 'certificate', component: CertificateView },
-  { path: '/certificate/:ref', name: 'certificate-ref', component: CertificateView },
-  { path: '/tag/:tagNumber', name: 'tag-view', component: TagView },
-  { path: '/check-in',     name: 'checkin',  component: CheckIn,
-    meta: { requiresAuth: true, roles: ALL_ADMIN } },
-  { path: '/past-events',  name: 'past',     component: PastEvents },
-  { path: '/shop',          name: 'shop',     component: Souvenirs },
-  { path: '/shop/verify',   name: 'shop-verify', component: Souvenirs },
+  /* Platform-level (no tenant) */
+  { path: '/platform/login',     name: 'platform-login',     component: PlatformLogin,     meta: { guestOnly: true } },
+  { path: '/platform',           name: 'platform-dashboard', component: PlatformDashboard, meta: { requiresPlatform: true } },
 
-  /* Admin login ─────────────────────────────────────────── */
-  { path: '/admin/login',  name: 'admin-login', component: AdminLogin,
-    meta: { guestOnly: true } },
+  /* Tenant landing & public pages */
+  { path: '/:slug',              name: 'home',          component: Landing,         meta: { tenant: true } },
+  { path: '/:slug/register',     name: 'register',      component: RegisterTicket,  meta: { tenant: true } },
+  { path: '/:slug/ticket/verify', name: 'ticket-verify', component: TicketView,     meta: { tenant: true } },
+  { path: '/:slug/ticket/:ref',  name: 'ticket',        component: TicketView,      meta: { tenant: true } },
+  { path: '/:slug/certificate',  name: 'certificate',   component: CertificateView, meta: { tenant: true } },
+  { path: '/:slug/certificate/:ref', name: 'certificate-ref', component: CertificateView, meta: { tenant: true } },
+  { path: '/:slug/tag/:tagNumber', name: 'tag-view',    component: TagView,         meta: { tenant: true } },
+  { path: '/:slug/check-in',     name: 'checkin',       component: CheckIn,         meta: { tenant: true, requiresAuth: true, roles: ALL_ADMIN } },
+  { path: '/:slug/past-events',  name: 'past',          component: PastEvents,      meta: { tenant: true } },
+  { path: '/:slug/shop',         name: 'shop',          component: Souvenirs,       meta: { tenant: true } },
+  { path: '/:slug/shop/verify',  name: 'shop-verify',   component: Souvenirs,       meta: { tenant: true } },
+  { path: '/:slug/p/:pageSlug',  name: 'tenant-page',   component: TenantPage,      meta: { tenant: true } },
 
-  /* Admin (all protected) ───────────────────────────────── */
+  /* Tenant admin */
+  { path: '/:slug/admin/login',  name: 'admin-login',   component: AdminLogin,      meta: { tenant: true, guestOnly: true } },
   {
-    path: '/admin',
+    path: '/:slug/admin',
     component: AdminLayout,
-    /* 
-      requiresAuth on the PARENT is checked via to.matched.some() in the guard.
-      All child routes inherit it automatically through matched records.
-    */
-    meta: { requiresAuth: true, roles: ALL_ADMIN },
-    children: [
-      { path: '',                    redirect: '/admin/dashboard' },
-
-      /* Overview */
-      { path: 'dashboard',           name: 'admin-dashboard',       component: AdminDashboard,
-        meta: { roles: ALL_ADMIN } },
-      { path: 'event-dashboard',     name: 'admin-event-dashboard', component: AdminEventDashboard,
-        meta: { roles: ADMIN_ONLY } },
-      { path: 'reports',             name: 'admin-reports',         component: AdminReports,
-        meta: { roles: ADMIN_ONLY } },
-
-      /* Events */
-      { path: 'events',              name: 'admin-events',          component: AdminEvents,
-        meta: { roles: ADMIN_ONLY } },
-      { path: 'events/new',          name: 'admin-event-create',    component: CreateEvent,
-        meta: { roles: ADMIN_ONLY } },
-      { path: 'events/:id',          name: 'admin-event-detail',    component: EventDetail,
-        meta: { roles: ADMIN_ONLY } },
-      { path: 'events/:id/schedule', name: 'admin-schedule',        component: AdminSchedule,
-        meta: { roles: ADMIN_ONLY } },
-      { path: 'events/:id/ticket-types', name: 'admin-ticket-types', component: AdminTicketTypes,
-        meta: { roles: ADMIN_ONLY } },
-
-      /* Operations */
-      { path: 'categories',          name: 'admin-categories',      component: AdminCategories,
-        meta: { roles: ADMIN_ONLY } },
-      { path: 'attendance',          name: 'admin-attendance',      component: AdminAttendance,
-        meta: { roles: ALL_ADMIN } },
-      { path: 'tags',                name: 'admin-tags',            component: AdminTags,
-        meta: { roles: ADMIN_ONLY } },
-      { path: 'hostels',             name: 'admin-hostels',         component: AdminHostels,
-        meta: { roles: ADMIN_ONLY } },
-      { path: 'gallery',             name: 'admin-gallery',         component: AdminGallery,
-        meta: { roles: ADMIN_ONLY } },
-
-      /* Participants */
-      { path: 'participants',        name: 'admin-participants',    component: AdminParticipants,
-        meta: { roles: ADMIN_ONLY } },
-      { path: 'register',            name: 'admin-manual-register', component: AdminManualRegister,
-        meta: { roles: ADMIN_ONLY } },
-      { path: 'email',               name: 'admin-email',           component: AdminEmail,
-        meta: { roles: ADMIN_ONLY } },
-
-      /* Finance */
-      { path: 'departments',         name: 'admin-departments',     component: AdminDepartments,
-        meta: { roles: ADMIN_ONLY } },
-      { path: 'expenses',            name: 'admin-expenses',        component: AdminExpenses,
-        meta: { roles: DEPT_PLUS } },
-
-      /* System */
-      { path: 'admins',              name: 'admin-admins',          component: AdminAdmins,
-        meta: { roles: SUPER_ONLY } },
-      { path: 'settings',            name: 'admin-settings',        component: AdminSettings,
-        meta: { roles: ALL_ADMIN } },
-      { path: 'souvenirs',           name: 'admin-souvenirs',       component: AdminSouvenirs,
-        meta: { roles: ADMIN_ONLY } },
-      { path: 'sponsors',            name: 'admin-sponsors',        component: AdminSponsors,
-        meta: { roles: ADMIN_ONLY } },
-      { path: 'media',               name: 'admin-media',           component: AdminMediaUpload,
-        meta: { roles: ALL_ADMIN } },
-    ],
+    meta: { tenant: true, requiresAuth: true, roles: ALL_ADMIN },
+    children: adminChildren,
   },
 
-  /* Catch-all — must be last */
+  /* Root: platform splash / tenant picker */
+  { path: '/', name: 'root', component: PlatformHome },
+
+  /* Catch-all */
   { path: '/:pathMatch(.*)*', name: 'not-found', redirect: '/' },
 ];
 
@@ -143,35 +117,48 @@ const router = createRouter({
   routes,
   scrollBehavior(to, _from, savedPosition) {
     if (savedPosition) return savedPosition;
-    // Hash navigation — let the landing page handle smooth scroll
     if (to.hash) return { el: to.hash, behavior: 'smooth', top: 80 };
     return { top: 0, behavior: 'smooth' };
   },
 });
 
 /* ─── Navigation guard ───────────────────────────────────── */
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const auth = useAuthStore();
 
-  // Guest-only pages (login): redirect authenticated users away
-  if (to.meta.guestOnly && auth.isAuthenticated) {
-    const dest = auth.admin?.role === 'department' ? '/admin/expenses' : '/admin/dashboard';
-    return next(dest);
+  // Platform-admin pages
+  if (to.meta.requiresPlatform) {
+    if (!localStorage.getItem('mys_platform_token')) return next({ name: 'platform-login' });
+    return next();
   }
 
-  // Check requiresAuth on this route OR any parent route
+  // Load the tenant for any tenant-scoped route
+  if (to.meta.tenant && to.params.slug) {
+    const tenantStore = useTenantStore();
+    const t = await tenantStore.loadTenant(to.params.slug);
+    if (!t) return next({ name: 'root' });
+  }
+
+  // Guest-only (login): redirect authenticated users away
+  if (to.meta.guestOnly && auth.isAuthenticated && to.params.slug) {
+    const slug = to.params.slug;
+    return next(auth.admin?.role === 'department'
+      ? `/${slug}/admin/expenses` : `/${slug}/admin/dashboard`);
+  }
+
+  // requiresAuth
   const requiresAuth = to.matched.some(r => r.meta.requiresAuth);
   if (requiresAuth && !auth.isAuthenticated) {
-    return next({ name: 'admin-login', query: { redirect: to.fullPath } });
+    return next({ name: 'admin-login', params: { slug: to.params.slug }, query: { redirect: to.fullPath } });
   }
 
-  // Role check: use the most specific (deepest) route's roles
+  // Role check
   const roleMeta = [...to.matched].reverse().find(r => r.meta.roles);
   if (roleMeta && auth.isAuthenticated) {
-    const allowed = roleMeta.meta.roles;
-    if (!allowed.includes(auth.admin?.role)) {
-      const fallback = auth.admin?.role === 'department' ? '/admin/expenses' : '/admin/dashboard';
-      return next(fallback);
+    if (!roleMeta.meta.roles.includes(auth.admin?.role)) {
+      const slug = to.params.slug;
+      return next(auth.admin?.role === 'department'
+        ? `/${slug}/admin/expenses` : `/${slug}/admin/dashboard`);
     }
   }
 
