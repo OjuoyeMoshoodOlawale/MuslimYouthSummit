@@ -102,3 +102,21 @@ FINAL STEP (needs a running DB — user action):
 NOTE: All scoping uses tenantWhere() which INCLUDES NULL rows, so a single-tenant
 install (no tenants table populated) keeps working unchanged. The base MYS data
 becomes tenant "mys" after the backfill.
+
+## SESSION ADDENDUM — multi-tenant correctness audit (+ 3D landing)
+- 3D platform landing (Three.js): hub + per-tenant orbiting nodes, parallax,
+  click-to-enter. Lazy-loaded. Production build passes.
+- FIXED latent build-breaker: CSS-variable brand colours broke Tailwind /opacity
+  utilities → switched to rgb(var(--x-rgb) / <alpha-value>); tenantStore sets
+  R G B triplets.
+- FIXED admins.email was GLOBALLY unique → now UNIQUE(tenant_id, email) via
+  tenant-schema procedure + setup-script fallback. Same email can admin
+  multiple orgs.
+- FIXED participant find-or-create looked up by email globally in BOTH the
+  public ticket flow and the admin manual-register flow → now tenant-scoped +
+  stamps tenant_id.
+- Added `npm run setup:tenant`.
+- Verified: full backend imports clean; frontend production build succeeds.
+
+STILL PENDING (needs your DB): run `cd backend && npm run setup:tenant`, then
+test /mys + /icp end-to-end.
