@@ -14,8 +14,10 @@ export const initiateTicketPurchase = async (req, res, next) => {
   try {
     const {
       event_id, ticket_type_id, category_id,
-      name, email, phone, gender, occupation
+      name, email, phone, gender, occupation,
+      quantity: rawQty,
     } = req.body;
+    const quantity = Math.max(1, Math.min(20, parseInt(rawQty) || 1)); // cap 1-20
 
     // Validate event (status = 'active' is the only gate; no separate registration_open column)
     const [events] = await query(
@@ -38,14 +40,18 @@ export const initiateTicketPurchase = async (req, res, next) => {
     const ticketType = ticketTypes[0];
 
     // Check capacity (schema uses quantity_available / quantity_sold)
-    if (ticketType.quantity_available && ticketType.quantity_sold >= ticketType.quantity_available) {
-      return error(res, `Sorry, ${ticketType.name} tickets are sold out.`, 409);
+    if (ticketType.quantity_available && ticketType.quantity_sold + quantity > ticketType.quantity_available) {
+      const left = ticketType.quantity_available - ticketType.quantity_sold;
+      return error(res, left > 0
+        ? `Only ${left} ${ticketType.name} ticket(s) left — reduce your quantity.`
+        : `Sorry, ${ticketType.name} tickets are sold out.`, 409);
     }
 
     // Determine price (respect early_bird_closes_at from event)
     const earlyBirdOpen = events[0].early_bird_closes_at && new Date(events[0].early_bird_closes_at) > new Date();
     const isEarlyBird   = earlyBirdOpen && !!ticketType.early_bird_price;
-    const price         = isEarlyBird ? parseFloat(ticketType.early_bird_price) : parseFloat(ticketType.regular_price);
+    const unitPrice     = isEarlyBird ? parseFloat(ticketType.early_bird_price) : parseFloat(ticketType.regular_price);
+    const price         = unitPrice * quantity;  // total for all tickets
     // Gross up so the organisation receives the EXACT ticket price after Paystack's cut.
     // The buyer pays price + processing fee.
     const { total: chargeAmount } = grossUpForPaystack(price);
@@ -70,18 +76,9 @@ export const initiateTicketPurchase = async (req, res, next) => {
       participantId = inserted.insertId;
     }
 
-    // Check for existing paid ticket
-    const [existingTicket] = await query(
-      "SELECT id, unique_number FROM tickets WHERE participant_id = ? AND event_id = ? AND status = 'paid'",
-      [participantId, event_id]
-    );
-    if (existingTicket.length) {
-      return error(
-        res,
-        `You already have a registered ticket for this event (${existingTicket[0].unique_number}). Check your email for your ticket details.`,
-        409
-      );
-    }
+    // Note: a PAID ticket no longer blocks buying again — a person may buy
+    // multiple tickets (e.g. for family/friends). Each purchase gets its own
+    // unique_number. Pending rows are reused below to avoid abandoned duplicates.
 
     // Generate ticket number
     const [[{ nextSeq }]] = await query(
@@ -121,17 +118,31 @@ export const initiateTicketPurchase = async (req, res, next) => {
       await query(
         `UPDATE tickets
          SET ticket_type_id = ?, category_id = ?, paystack_reference = ?,
-             amount_paid = ?, is_early_bird = ?, unique_number = ?
+             amount_paid = ?, quantity = ?, is_early_bird = ?, unique_number = ?
          WHERE id = ?`,
-        [ticket_type_id, category_id || null, paystackRef, price, isEarlyBird ? 1 : 0, uniqueNumber, pendingExisting[0].id]
+        [ticket_type_id, category_id || null, paystackRef, price, quantity, isEarlyBird ? 1 : 0, uniqueNumber, pendingExisting[0].id]
       );
     } else {
-      // Create pending ticket
-      await query(
-        `INSERT INTO tickets (participant_id, event_id, ticket_type_id, category_id, unique_number, paystack_reference, amount_paid, is_early_bird, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
-        [participantId, event_id, ticket_type_id, category_id || null, uniqueNumber, paystackRef, price, isEarlyBird ? 1 : 0]
-      );
+      // Create pending ticket — retry with a fresh sequence if unique_number
+      // collides (rare, under concurrent purchases).
+      let attempt = 0, inserted = false, num = uniqueNumber;
+      while (!inserted && attempt < 5) {
+        try {
+          await query(
+            `INSERT INTO tickets (participant_id, event_id, ticket_type_id, category_id, unique_number, paystack_reference, amount_paid, quantity, is_early_bird, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+            [participantId, event_id, ticket_type_id, category_id || null, num, paystackRef, price, quantity, isEarlyBird ? 1 : 0]
+          );
+          inserted = true;
+          uniqueNumber = num;
+        } catch (insErr) {
+          if (insErr.code === 'ER_DUP_ENTRY' && attempt < 4) {
+            attempt++;
+            const [[{ retrySeq }]] = await query('SELECT COALESCE(MAX(id),0) + 1 + ? AS retrySeq FROM tickets', [attempt]);
+            num = generateTicketNumber(events[0].edition || '3', retrySeq);
+          } else { throw insErr; }
+        }
+      }
     }
 
     // Init Paystack
@@ -159,6 +170,8 @@ export const initiateTicketPurchase = async (req, res, next) => {
       reference:         paystackRef,
       ticket_number:     uniqueNumber,
       amount:            price,
+      quantity,
+      unit_price:        unitPrice,
       is_early_bird:     isEarlyBird,
     }, 'Payment initiated. Complete your payment to confirm your ticket.');
   } catch (err) {
@@ -212,10 +225,10 @@ export const verifyTicketPayment = async (req, res, next) => {
         [qrSvg, ticket.id]
       );
 
-      // Increment quantity_sold
+      // Increment quantity_sold by this ticket's quantity
       await conn.execute(
-        'UPDATE ticket_types SET quantity_sold = quantity_sold + 1 WHERE id = ?',
-        [ticket.ticket_type_id]
+        'UPDATE ticket_types SET quantity_sold = quantity_sold + ? WHERE id = ?',
+        [ticket.quantity || 1, ticket.ticket_type_id]
       );
 
       // Update participant timestamp

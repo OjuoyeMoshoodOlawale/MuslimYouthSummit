@@ -193,6 +193,7 @@ CREATE TABLE IF NOT EXISTS tickets (
   unique_number      VARCHAR(30) NOT NULL UNIQUE COMMENT 'e.g. MYS3-25-000001',
   qr_code_svg        MEDIUMTEXT NULL,
   amount_paid        DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  quantity           SMALLINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'number of admissions on this ticket',
   balance_due        DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   payment_method     ENUM('paystack','cash','bank_transfer','pos','waived','other') NULL,
   payment_note       TEXT NULL,

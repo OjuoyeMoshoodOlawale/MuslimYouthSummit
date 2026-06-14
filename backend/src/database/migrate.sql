@@ -195,3 +195,23 @@ DROP PROCEDURE IF EXISTS DropUniqueRefIfExists;
 CREATE INDEX IF NOT EXISTS idx_souvenir_ref ON souvenir_orders(paystack_reference);
 
 SELECT 'Migration complete!' AS result;
+
+-- ─────────────────────────────────────────────────────────────
+-- Multi-ticket purchase: add quantity to tickets
+-- ─────────────────────────────────────────────────────────────
+DELIMITER $$
+DROP PROCEDURE IF EXISTS AddTicketQty$$
+CREATE PROCEDURE AddTicketQty()
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.COLUMNS
+    WHERE table_schema = DATABASE() AND table_name='tickets' AND column_name='quantity'
+  ) THEN
+    ALTER TABLE tickets ADD COLUMN quantity SMALLINT UNSIGNED NOT NULL DEFAULT 1 AFTER amount_paid;
+  END IF;
+END$$
+DELIMITER ;
+CALL AddTicketQty();
+DROP PROCEDURE IF EXISTS AddTicketQty;
+
+SELECT 'Ticket quantity migration complete!' AS result;

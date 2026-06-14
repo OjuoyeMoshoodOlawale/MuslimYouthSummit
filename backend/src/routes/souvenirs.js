@@ -117,25 +117,28 @@ router.post('/souvenirs/cart/order', async (req, res, next) => {
     const { total: chargeAmount } = grossUpForPaystack(subtotal);
     const reference = `CART-${Date.now()}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
 
-    // One human-readable order number for the whole cart
-    const [[{ orderSeq }]] = await query('SELECT COUNT(*) + 1 AS orderSeq FROM souvenir_orders');
+    // Collision-proof base order number (COUNT(*)+1 collides with pending orders).
+    // Each line row gets a unique suffix; all share ONE paystack_reference.
     const yy = new Date().getFullYear().toString().slice(-2);
-    const order_number = `SVN-${yy}-${String(orderSeq).padStart(6,'0')}`;
+    const baseOrderNo = `SVN-${yy}-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2,4).toUpperCase()}`;
 
-    // One order row PER line item, all sharing the same reference & order_number
+    // One order row PER line item, sharing the reference; unique order_number each
     const orderIds = [];
-    for (const ln of lines) {
+    for (let i = 0; i < lines.length; i++) {
+      const ln = lines[i];
+      const lineOrderNo = lines.length > 1 ? `${baseOrderNo}-${i + 1}` : baseOrderNo;
       const [r] = await query(
         `INSERT INTO souvenir_orders
            (order_number, souvenir_id, buyer_name, buyer_email, buyer_phone, quantity, unit_price,
             total_amount, status, paystack_reference, delivery_address, notes)
          VALUES (?,?,?,?,?,?,?,?,'pending',?,?,?)`,
-        [order_number, ln.sv.id, buyer_name.trim(), buyer_email.toLowerCase(), buyer_phone || null,
+        [lineOrderNo, ln.sv.id, buyer_name.trim(), buyer_email.toLowerCase(), buyer_phone || null,
          ln.qty, ln.unit, ln.line_total, reference,
          delivery_address || null, notes || null]
       );
       orderIds.push(r.insertId);
     }
+    const order_number = baseOrderNo;
 
     const payData = await initializeTransaction({
       email:        buyer_email.toLowerCase(),
@@ -184,12 +187,10 @@ router.post('/souvenirs/:id/order', async (req, res, next) => {
     const { total: chargeAmount } = grossUpForPaystack(total_amount);
     const reference    = `SVN-${Date.now()}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
 
-    // Generate human-readable order number: SVN-25-000001
-    const [[{ orderSeq }]] = await query(
-      "SELECT COUNT(*) + 1 AS orderSeq FROM souvenir_orders"
-    );
-    const yy          = new Date().getFullYear().toString().slice(-2);
-    const order_number = `SVN-${yy}-${String(orderSeq).padStart(6,'0')}`;
+    // Collision-proof order number: SVN-25-<base36 timestamp>-<rand>
+    // (COUNT(*)+1 collides when there are abandoned/pending orders)
+    const yy = new Date().getFullYear().toString().slice(-2);
+    const order_number = `SVN-${yy}-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2,4).toUpperCase()}`;
 
     // Create pending order
     const [r] = await query(

@@ -13,6 +13,6 @@ router.post('/assign-tag', authenticate, assignTagAndCheckIn);
 router.post('/check-out', authenticate, checkOut);
 router.post('/checkout',  authenticate, checkOut);
 router.get('/live/:eventId', authenticate, liveAttendance);
-router.get('/report/:eventId', authenticate, authorize('super_admin', 'admin'), attendanceReport);
+router.get('/report/:eventId', authenticate, authorize('super_admin', 'admin', 'attendant'), attendanceReport);
 
 export default router;
