@@ -10,22 +10,23 @@ const BASE = 'https://api.paystack.co';
 const PLACEHOLDER = /^sk_(test|live)_x+$/i;
 
 /** Validate that we have a real (non-placeholder) secret key */
-const assertKey = () => {
-  const key = process.env.PAYSTACK_SECRET_KEY;
+const assertKey = (overrideKey = null) => {
+  const key = overrideKey || process.env.PAYSTACK_SECRET_KEY;
   if (!key || PLACEHOLDER.test(key)) {
     throw new Error(
-      'Paystack is not configured. Add your PAYSTACK_SECRET_KEY to backend/.env. ' +
+      'Paystack is not configured. Add your PAYSTACK_SECRET_KEY to backend/.env ' +
+      'or set the organisation\'s own keys in Settings. ' +
       'Get test keys at https://dashboard.paystack.com/#/settings/developers'
     );
   }
   return key;
 };
 
-/** Build an authenticated axios instance */
-const ps = () => axios.create({
+/** Build an authenticated axios instance (optionally with a tenant's key) */
+const ps = (overrideKey = null) => axios.create({
   baseURL: BASE,
   headers: {
-    Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+    Authorization: `Bearer ${overrideKey || process.env.PAYSTACK_SECRET_KEY}`,
     'Content-Type': 'application/json',
   },
   timeout: 15_000,
@@ -35,15 +36,15 @@ const ps = () => axios.create({
  * Initialize a Paystack transaction.
  * Returns { authorization_url, access_code, reference }
  */
-export const initializeTransaction = async ({ email, amount, reference, metadata, callback_url }) => {
-  assertKey();
+export const initializeTransaction = async ({ email, amount, reference, metadata, callback_url, secretKey = null }) => {
+  assertKey(secretKey);
   // Always provide a callback URL so Paystack can redirect back after payment
   const finalCallbackUrl = callback_url
     || process.env.PAYMENT_CALLBACK_URL
     || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/ticket/verify`;
 
   try {
-    const { data } = await ps().post('/transaction/initialize', {
+    const { data } = await ps(secretKey).post('/transaction/initialize', {
       email,
       amount,   // in kobo
       reference,
@@ -74,10 +75,10 @@ export const initializeTransaction = async ({ email, amount, reference, metadata
  * Verify a Paystack transaction.
  * Returns the full Paystack transaction object.
  */
-export const verifyTransaction = async (reference) => {
-  assertKey();
+export const verifyTransaction = async (reference, secretKey = null) => {
+  assertKey(secretKey);
   try {
-    const { data } = await ps().get(`/transaction/verify/${encodeURIComponent(reference)}`);
+    const { data } = await ps(secretKey).get(`/transaction/verify/${encodeURIComponent(reference)}`);
     if (!data.status) throw new Error(data.message || 'Paystack verification failed.');
     return data.data;
   } catch (err) {

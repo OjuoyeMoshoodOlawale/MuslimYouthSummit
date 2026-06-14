@@ -5,6 +5,7 @@ import { success, created, error, notFound } from '../utils/response.js';
 import { initializeTransaction, verifyTransaction } from '../services/paystackService.js';
 import { grossUpForPaystack } from '../utils/paystackFees.js';
 import { tenantWhere, stampId } from '../utils/tenantScope.js';
+import { resolvePaystackKeys } from '../utils/paystackKeys.js';
 
 const router = express.Router();
 const adm    = [authenticate, authorize('super_admin', 'admin')];
@@ -144,12 +145,14 @@ router.post('/souvenirs/cart/order', async (req, res, next) => {
     }
     const order_number = baseOrderNo;
 
+    const keys = resolvePaystackKeys(req.tenant);
     const payData = await initializeTransaction({
       email:        buyer_email.toLowerCase(),
       amount:       Math.round(chargeAmount * 100),
       reference,
       metadata:     { order_number, item_count: lines.length, buyer_name, cart: true },
       callback_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/shop/verify?ref=${reference}`,
+      secretKey:    keys.secret,
     });
 
     created(res, {
@@ -158,7 +161,7 @@ router.post('/souvenirs/cart/order', async (req, res, next) => {
       reference,
       payment_url:  payData.authorization_url,
       access_code:  payData.access_code,
-      public_key:   process.env.PAYSTACK_PUBLIC_KEY,
+      public_key:   keys.public,
       subtotal,
       total:        chargeAmount,
       fee:          chargeAmount - subtotal,
@@ -208,12 +211,14 @@ router.post('/souvenirs/:id/order', async (req, res, next) => {
     );
 
     // Initiate Paystack
+    const keys = resolvePaystackKeys(req.tenant);
     const payData = await initializeTransaction({
       email:        buyer_email.toLowerCase(),
       amount:       Math.round(chargeAmount * 100), // kobo (item total + Paystack fee)
       reference,
       metadata:     { souvenir_id: sv.id, order_id: r.insertId, buyer_name, souvenir_name: sv.name, quantity },
       callback_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/shop/verify?ref=${reference}`,
+      secretKey:    keys.secret,
     });
 
     created(res, {
@@ -221,7 +226,7 @@ router.post('/souvenirs/:id/order', async (req, res, next) => {
       reference,
       payment_url:  payData.authorization_url,
       access_code:  payData.access_code,
-      public_key:   process.env.PAYSTACK_PUBLIC_KEY,
+      public_key:   keys.public,
       subtotal:     total_amount,
       total:        chargeAmount,
       fee:          chargeAmount - total_amount,
@@ -246,7 +251,7 @@ router.get('/souvenirs/verify/:reference', async (req, res, next) => {
       return success(res, { ...orders[0], status: 'paid', items: orders }, 'Already confirmed.');
     }
 
-    const verData = await verifyTransaction(reference);
+    const verData = await verifyTransaction(reference, resolvePaystackKeys(req.tenant).secret);
     if (verData.status !== 'success')
       return error(res, 'Payment not confirmed yet.', 402);
 

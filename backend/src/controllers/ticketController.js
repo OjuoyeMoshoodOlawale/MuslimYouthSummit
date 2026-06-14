@@ -2,6 +2,7 @@ import { query, transaction } from '../database/db.js';
 import { success, created, error, notFound as notFoundRes } from '../utils/response.js';
 import { initializeTransaction, verifyTransaction, verifyWebhookSignature } from '../services/paystackService.js';
 import { grossUpForPaystack } from '../utils/paystackFees.js';
+import { resolvePaystackKeys } from '../utils/paystackKeys.js';
 import { generateQRCodeSVG, ticketQRData } from '../services/qrcodeService.js';
 import { sendTicketEmail } from '../services/emailService.js';
 import {
@@ -146,10 +147,12 @@ export const initiateTicketPurchase = async (req, res, next) => {
     }
 
     // Init Paystack
+    const ptKeys = resolvePaystackKeys(req.tenant);
     const paystackData = await initializeTransaction({
       email: email.toLowerCase(),
       amount: amountKobo,
       reference: paystackRef,
+      secretKey: ptKeys.secret,
       metadata: {
         custom_fields: [
           { display_name: 'Full Name', variable_name: 'name', value: name },
@@ -166,7 +169,7 @@ export const initiateTicketPurchase = async (req, res, next) => {
     return success(res, {
       authorization_url: paystackData.authorization_url,
       access_code:       paystackData.access_code,
-      public_key:        process.env.PAYSTACK_PUBLIC_KEY,
+      public_key:        ptKeys.public,
       reference:         paystackRef,
       ticket_number:     uniqueNumber,
       amount:            price,
@@ -208,7 +211,7 @@ export const verifyTicketPayment = async (req, res, next) => {
     }
 
     // Verify with Paystack
-    const txData = await verifyTransaction(reference);
+    const txData = await verifyTransaction(reference, resolvePaystackKeys(req.tenant).secret);
 
     if (txData.status !== 'success') {
       return error(res, `Payment was not successful. Status: ${txData.status}. Please try again or contact support.`);
