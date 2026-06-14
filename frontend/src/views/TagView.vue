@@ -48,11 +48,39 @@
           </span>
         </div>
 
-        <!-- Status -->
+        <!-- Details -->
         <div class="border-t border-gray-100 pt-4 space-y-2.5">
           <div class="flex items-center justify-between text-sm">
-            <span class="text-gray-400">Ticket</span>
+            <span class="text-gray-400">Ticket No.</span>
             <span class="font-mono font-semibold text-gray-700">{{ data.participant.ticket_number }}</span>
+          </div>
+          <div v-if="data.participant.ticket_type" class="flex items-center justify-between text-sm">
+            <span class="text-gray-400">Ticket Type</span>
+            <span class="font-semibold text-gray-700">{{ data.participant.ticket_type }}</span>
+          </div>
+          <div v-if="data.participant.email" class="flex items-center justify-between text-sm">
+            <span class="text-gray-400">Email</span>
+            <span class="font-semibold text-gray-700 truncate ml-2">{{ data.participant.email }}</span>
+          </div>
+          <div v-if="data.participant.phone" class="flex items-center justify-between text-sm">
+            <span class="text-gray-400">Phone</span>
+            <span class="font-semibold text-gray-700">{{ data.participant.phone }}</span>
+          </div>
+          <div v-if="data.participant.gender" class="flex items-center justify-between text-sm">
+            <span class="text-gray-400">Gender</span>
+            <span class="font-semibold text-gray-700 capitalize">{{ data.participant.gender.replace(/_/g,' ') }}</span>
+          </div>
+          <div v-if="data.participant.occupation" class="flex items-center justify-between text-sm">
+            <span class="text-gray-400">Occupation</span>
+            <span class="font-semibold text-gray-700">{{ data.participant.occupation }}</span>
+          </div>
+          <div v-if="data.participant.hostel" class="flex items-center justify-between text-sm">
+            <span class="text-gray-400">Hostel</span>
+            <span class="font-semibold text-gray-700">{{ data.participant.hostel }}<span v-if="data.participant.room_number"> · Rm {{ data.participant.room_number }}</span></span>
+          </div>
+          <div v-if="data.venue" class="flex items-center justify-between text-sm">
+            <span class="text-gray-400">Venue</span>
+            <span class="font-semibold text-gray-700">{{ data.venue }}</span>
           </div>
           <div class="flex items-center justify-between text-sm">
             <span class="text-gray-400">Status</span>
@@ -65,6 +93,14 @@
             <span v-else class="inline-flex items-center gap-1 font-semibold text-amber-600">
               <Clock :size="14" /> Not checked in
             </span>
+          </div>
+          <div v-if="data.participant.checked_in_at" class="flex items-center justify-between text-xs text-gray-400">
+            <span>Checked in</span>
+            <span>{{ formatTime(data.participant.checked_in_at) }}</span>
+          </div>
+          <div v-if="data.participant.checked_out_at" class="flex items-center justify-between text-xs text-gray-400">
+            <span>Checked out</span>
+            <span>{{ formatTime(data.participant.checked_out_at) }}</span>
           </div>
         </div>
 
@@ -96,6 +132,12 @@ import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { Loader, XCircle, CheckCircle2, LogOut, Clock, Ticket as TicketIcon } from 'lucide-vue-next';
 import api from '@/composables/useApi.js';
+
+const formatTime = (d) => {
+  if (!d) return '';
+  try { return new Date(d.replace(' ', 'T')).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' }); }
+  catch { return d; }
+};
 
 const route = useRoute();
 const tagNumber = ref((route.params.tagNumber || '').toUpperCase());

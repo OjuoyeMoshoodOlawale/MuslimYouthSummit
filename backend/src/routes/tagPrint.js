@@ -90,11 +90,23 @@ router.get('/events/:eventId/tags/print', authenticate, async (req, res, next) =
     // Tags are printed BEFORE the event and assigned to people at registry on the day.
     const buildBadge = (tag, event) => {
       const tagNum = tag.tag_number || '???';
-      const qr = tag.qr_code_svg
-        ? tag.qr_code_svg
-            .replace(/width="\d+"/, 'width="150"')
-            .replace(/height="\d+"/, 'height="150"')
-        : buildFallbackQR(tagNum);
+      // Make the QR responsive: ensure a viewBox (so it scales) and let CSS size
+      // it to the box. Strip any fixed width/height that would overflow.
+      let qr;
+      if (tag.qr_code_svg) {
+        let svg = tag.qr_code_svg;
+        // Capture the existing pixel size to build a viewBox if none exists
+        const wMatch = svg.match(/width="(\d+)"/);
+        const size = wMatch ? wMatch[1] : '300';
+        if (!/viewBox=/.test(svg)) {
+          svg = svg.replace('<svg', `<svg viewBox="0 0 ${size} ${size}" preserveAspectRatio="xMidYMid meet"`);
+        }
+        // Remove fixed width/height so CSS (100% of the 124px box) controls size
+        svg = svg.replace(/\swidth="\d+"/, '').replace(/\sheight="\d+"/, '');
+        qr = svg;
+      } else {
+        qr = buildFallbackQR(tagNum);
+      }
 
       return `
       <div class="badge">
@@ -302,13 +314,22 @@ router.get('/events/:eventId/tags/print', authenticate, async (req, res, next) =
       align-items: center;
       justify-content: center;
       background: white;
-      padding: 8px;
+      padding: 6px;
       border: 2px solid rgba(2,70,46,0.12);
       border-radius: 4px;
       margin-top: 4px;
+      width: 124px;
+      height: 124px;
+      box-sizing: border-box;
     }
 
-    .badge-qr svg { display: block; }
+    .badge-qr svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      max-width: 112px;
+      max-height: 112px;
+    }
 
     .badge-scan {
       font-size: 8px;
