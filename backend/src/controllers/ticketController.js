@@ -70,18 +70,9 @@ export const initiateTicketPurchase = async (req, res, next) => {
       participantId = inserted.insertId;
     }
 
-    // Check for existing paid ticket
-    const [existingTicket] = await query(
-      "SELECT id, unique_number FROM tickets WHERE participant_id = ? AND event_id = ? AND status = 'paid'",
-      [participantId, event_id]
-    );
-    if (existingTicket.length) {
-      return error(
-        res,
-        `You already have a registered ticket for this event (${existingTicket[0].unique_number}). Check your email for your ticket details.`,
-        409
-      );
-    }
+    // Note: a PAID ticket no longer blocks buying again — a person may buy
+    // multiple tickets (e.g. for family/friends). Each purchase gets its own
+    // unique_number. Pending rows are reused below to avoid abandoned duplicates.
 
     // Generate ticket number
     const [[{ nextSeq }]] = await query(
