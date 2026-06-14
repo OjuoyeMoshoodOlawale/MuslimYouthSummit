@@ -117,12 +117,26 @@ export const initiateTicketPurchase = async (req, res, next) => {
         [ticket_type_id, category_id || null, paystackRef, price, isEarlyBird ? 1 : 0, uniqueNumber, pendingExisting[0].id]
       );
     } else {
-      // Create pending ticket
-      await query(
-        `INSERT INTO tickets (participant_id, event_id, ticket_type_id, category_id, unique_number, paystack_reference, amount_paid, is_early_bird, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
-        [participantId, event_id, ticket_type_id, category_id || null, uniqueNumber, paystackRef, price, isEarlyBird ? 1 : 0]
-      );
+      // Create pending ticket — retry with a fresh sequence if unique_number
+      // collides (rare, under concurrent purchases).
+      let attempt = 0, inserted = false, num = uniqueNumber;
+      while (!inserted && attempt < 5) {
+        try {
+          await query(
+            `INSERT INTO tickets (participant_id, event_id, ticket_type_id, category_id, unique_number, paystack_reference, amount_paid, is_early_bird, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+            [participantId, event_id, ticket_type_id, category_id || null, num, paystackRef, price, isEarlyBird ? 1 : 0]
+          );
+          inserted = true;
+          uniqueNumber = num;
+        } catch (insErr) {
+          if (insErr.code === 'ER_DUP_ENTRY' && attempt < 4) {
+            attempt++;
+            const [[{ retrySeq }]] = await query('SELECT COALESCE(MAX(id),0) + 1 + ? AS retrySeq FROM tickets', [attempt]);
+            num = generateTicketNumber(events[0].edition || '3', retrySeq);
+          } else { throw insErr; }
+        }
+      }
     }
 
     // Init Paystack

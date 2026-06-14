@@ -58,3 +58,10 @@ super_admin/admin and 403s for attendants; OR a route guard blocks attendants.
 2. ✅ Buy multiple times: removed COUNT(*)+1 collisions + removed hard 409 block
    on repeat ticket buyers (pending rows still reused)
 3. ✅ Attendance for attendant role: granted report access
+
+---
+
+## NEXT BATCH — doing all, in order
+- [ ] TASK A: Verify the 3 fixes (logic review + edge cases)
+- [ ] TASK B: True multi-ticket purchase (buy N tickets in one payment, quantity selector)
+- [ ] TASK C: Continue multi-tenant branch (scope controllers, slug routing, branding)
