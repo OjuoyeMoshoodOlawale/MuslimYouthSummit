@@ -168,9 +168,9 @@
                     class="text-gray-400 hover:text-brand-green transition-colors p-1.5" title="View Ticket">
                     <Eye :size="14" />
                   </RouterLink>
-                  <!-- Certificate -->
-                  <a :href="`/api/tickets/certificate/${r.unique_number}`" target="_blank"
-                    class="text-gray-400 hover:text-brand-green transition-colors p-1.5" title="Print Certificate">
+                  <!-- Certificate (visual page, with admin token for preview) -->
+                  <a :href="certUrl(r.unique_number)" target="_blank"
+                    class="text-gray-400 hover:text-brand-green transition-colors p-1.5" title="View / Print Certificate">
                     <Award :size="14" />
                   </a>
                   <!-- Email -->
@@ -530,5 +530,13 @@ const sendBulkSms = async () => {
 
 const emailParticipant = (row) => {
   window.open(`mailto:${row.email}?subject=Muslim Youth Summit`, '_blank');
+};
+
+// Build the VISUAL certificate page URL (not the /api data route), with the
+// admin token so admins can preview before the event concludes.
+const certUrl = (uniqueNumber) => {
+  const token = auth.token || localStorage.getItem('mys_token') || '';
+  const base  = `/certificate/${encodeURIComponent(uniqueNumber)}`;
+  return token ? `${base}?token=${encodeURIComponent(token)}` : base;
 };
 </script>

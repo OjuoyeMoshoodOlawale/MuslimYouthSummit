@@ -110,7 +110,13 @@ const findCertificate = async () => {
   if (!val) return;
   busy.value = true; errorMsg.value = '';
   try {
-    const { data } = await api.get(`/tickets/certificate/${encodeURIComponent(val)}`);
+    // Pass the admin token (from URL ?token= or localStorage) so admins can
+    // preview before the event concludes, even in a freshly opened tab.
+    const token = route.query.token || localStorage.getItem('mys_token') || '';
+    const url = token
+      ? `/tickets/certificate/${encodeURIComponent(val)}?token=${encodeURIComponent(token)}`
+      : `/tickets/certificate/${encodeURIComponent(val)}`;
+    const { data } = await api.get(url);
     certificate.value = data.data;
   } catch (err) {
     errorMsg.value = err.response?.data?.message
