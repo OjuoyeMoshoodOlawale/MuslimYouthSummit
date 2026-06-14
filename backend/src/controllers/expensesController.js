@@ -5,6 +5,7 @@
  */
 import { query } from '../database/db.js';
 import { success, created, error, notFound } from '../utils/response.js';
+import { tenantWhere, stampId } from '../utils/tenantScope.js';
 
 /* ═══════════════════════════════════════════════════════════════
    DEPARTMENTS
@@ -12,6 +13,7 @@ import { success, created, error, notFound } from '../utils/response.js';
 
 export const listDepartments = async (req, res, next) => {
   try {
+    const t = tenantWhere(req, 'd');
     const [rows] = await query(
       `SELECT d.*,
               COUNT(DISTINCT a.id) AS member_count,
@@ -22,7 +24,9 @@ export const listDepartments = async (req, res, next) => {
        FROM departments d
        LEFT JOIN admins a ON a.department_id = d.id AND a.is_active = 1
        LEFT JOIN expense_requests e ON e.department_id = d.id
-       GROUP BY d.id ORDER BY d.sort_order, d.name`
+       WHERE 1=1${t.clause}
+       GROUP BY d.id ORDER BY d.sort_order, d.name`,
+      t.params
     );
     success(res, rows);
   } catch (e) { next(e); }
@@ -33,8 +37,8 @@ export const createDepartment = async (req, res, next) => {
     const { name, description, head_name, sort_order } = req.body;
     if (!name?.trim()) return error(res, 'Department name is required.', 400);
     const [r] = await query(
-      'INSERT INTO departments (name, description, head_name, sort_order) VALUES (?,?,?,?)',
-      [name.trim(), description || null, head_name || null, sort_order ?? 0]
+      'INSERT INTO departments (name, description, head_name, sort_order, tenant_id) VALUES (?,?,?,?,?)',
+      [name.trim(), description || null, head_name || null, sort_order ?? 0, stampId(req)]
     );
     created(res, { id: r.insertId }, 'Department created.');
   } catch (e) {

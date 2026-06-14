@@ -4,15 +4,18 @@
  */
 import { query } from '../database/db.js';
 import { success, created, error, notFound } from '../utils/response.js';
+import { tenantWhere, stampId } from '../utils/tenantScope.js';
 
 /* ── List hostels ────────────────────────────────────────────── */
 export const listHostels = async (req, res, next) => {
   try {
+    const t = tenantWhere(req, 'h');
     const [rows] = await query(
       `SELECT h.*,
               (SELECT COUNT(*) FROM hostel_assignments ha WHERE ha.hostel_id = h.id) AS total_assigned
-       FROM hostels h WHERE h.is_active = 1
-       ORDER BY h.sort_order, h.name`
+       FROM hostels h WHERE h.is_active = 1${t.clause}
+       ORDER BY h.sort_order, h.name`,
+      t.params
     );
     success(res, rows);
   } catch (e) { next(e); }
@@ -20,10 +23,12 @@ export const listHostels = async (req, res, next) => {
 
 export const listAllHostels = async (req, res, next) => {
   try {
+    const t = tenantWhere(req, 'h');
     const [rows] = await query(
       `SELECT h.*,
               (SELECT COUNT(*) FROM hostel_assignments ha WHERE ha.hostel_id = h.id) AS total_assigned
-       FROM hostels h ORDER BY h.sort_order, h.name`
+       FROM hostels h WHERE 1=1${t.clause} ORDER BY h.sort_order, h.name`,
+      t.params
     );
     success(res, rows);
   } catch (e) { next(e); }
@@ -34,12 +39,12 @@ export const createHostel = async (req, res, next) => {
   try {
     const { name, gender, beds, location, description, sort_order } = req.body;
     if (!name?.trim()) return error(res, 'Hostel name is required.', 400);
-    if (!capacity || capacity < 1) return error(res, 'Capacity must be at least 1.', 400);
+    if (!beds || beds < 1) return error(res, 'Number of beds must be at least 1.', 400);
     const [r] = await query(
-      `INSERT INTO hostels (name, gender, beds, location, description, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO hostels (name, gender, beds, location, description, sort_order, tenant_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [name.trim(), gender || 'mixed', beds,
-       location || null, description || null, sort_order ?? 0]
+       location || null, description || null, sort_order ?? 0, stampId(req)]
     );
     created(res, { id: r.insertId }, 'Hostel created.');
   } catch (e) { next(e); }

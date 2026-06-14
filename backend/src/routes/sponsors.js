@@ -2,6 +2,7 @@ import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { query } from '../database/db.js';
 import { success, created, error, notFound } from '../utils/response.js';
+import { tenantWhere, stampId } from '../utils/tenantScope.js';
 
 const router = express.Router();
 const adm    = [authenticate, authorize('super_admin', 'admin')];
@@ -16,6 +17,9 @@ router.get('/sponsors', async (req, res, next) => {
       where += ' AND (s.event_id = ? OR s.event_id IS NULL)';
       params.push(event_id);
     }
+    const tScope = tenantWhere(req, 's');
+    where += tScope.clause;
+    params.push(...tScope.params);
     const [rows] = await query(
       `SELECT s.*, e.title AS event_title, e.edition
        FROM sponsors s LEFT JOIN events e ON e.id = s.event_id
@@ -30,10 +34,13 @@ router.get('/sponsors', async (req, res, next) => {
 /* ── Admin: list all ──────────────────────────────────────────── */
 router.get('/sponsors/all', ...adm, async (req, res, next) => {
   try {
+    const tScope = tenantWhere(req, 's');
     const [rows] = await query(
       `SELECT s.*, e.title AS event_title, e.edition
        FROM sponsors s LEFT JOIN events e ON e.id = s.event_id
-       ORDER BY FIELD(s.tier,'title','gold','silver','bronze','media','partner'), s.sort_order`
+       WHERE 1=1${tScope.clause}
+       ORDER BY FIELD(s.tier,'title','gold','silver','bronze','media','partner'), s.sort_order`,
+      tScope.params
     );
     success(res, rows);
   } catch (e) { next(e); }
@@ -45,10 +52,10 @@ router.post('/sponsors', ...adm, async (req, res, next) => {
     const { event_id, name, logo_url, website_url, tier, description, sort_order } = req.body;
     if (!name?.trim()) return error(res, 'Sponsor name is required.', 400);
     const [r] = await query(
-      `INSERT INTO sponsors (event_id, name, logo_url, website_url, tier, description, sort_order)
-       VALUES (?,?,?,?,?,?,?)`,
+      `INSERT INTO sponsors (event_id, name, logo_url, website_url, tier, description, sort_order, tenant_id)
+       VALUES (?,?,?,?,?,?,?,?)`,
       [event_id || null, name.trim(), logo_url || null, website_url || null,
-       tier || 'gold', description || null, sort_order ?? 0]
+       tier || 'gold', description || null, sort_order ?? 0, stampId(req)]
     );
     created(res, { id: r.insertId }, 'Sponsor added.');
   } catch (e) { next(e); }
