@@ -132,14 +132,14 @@ export const getPrintableTags = async (req, res, next) => {
     }
 
     // Safety net: if any tag is missing its QR (created before QR was wired,
-    // or qrcode pkg failed at creation), generate it now and persist it.
+    // Always (re)generate the QR on print so it points to the current
+    // /tag/:tagNumber URL — this also repairs any blank or outdated QR
+    // (e.g. tags created before the QR pointed to the tag page).
     for (const tag of tags) {
-      if (!tag.qr_code_svg) {
-        try {
-          tag.qr_code_svg = await generateQRCodeSVG(tagQRData(tag.tag_number, eventId));
-          query('UPDATE event_tags SET qr_code_svg = ? WHERE id = ?', [tag.qr_code_svg, tag.id]).catch(() => {});
-        } catch { /* qrcode pkg missing — fallback shows tag number */ }
-      }
+      try {
+        tag.qr_code_svg = await generateQRCodeSVG(tagQRData(tag.tag_number, eventId));
+        query('UPDATE event_tags SET qr_code_svg = ? WHERE id = ?', [tag.qr_code_svg, tag.id]).catch(() => {});
+      } catch { /* generation failed — fallback shows tag number */ }
     }
 
     const FRONTEND = process.env.FRONTEND_URL || 'http://localhost:5173';

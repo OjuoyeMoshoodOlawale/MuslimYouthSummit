@@ -6,6 +6,7 @@ const Landing             = () => import('@/views/Landing.vue');
 const RegisterTicket      = () => import('@/views/RegisterTicket.vue');
 const TicketView          = () => import('@/views/TicketView.vue');
 const CertificateView     = () => import('@/views/CertificateView.vue');
+const TagView             = () => import('@/views/TagView.vue');
 const CheckIn             = () => import('@/views/CheckIn.vue');
 const PastEvents          = () => import('@/views/PastEvents.vue');
 
@@ -50,6 +51,7 @@ const routes = [
   { path: '/ticket/:ref',  name: 'ticket',   component: TicketView },
   { path: '/certificate',  name: 'certificate', component: CertificateView },
   { path: '/certificate/:ref', name: 'certificate-ref', component: CertificateView },
+  { path: '/tag/:tagNumber', name: 'tag-view', component: TagView },
   { path: '/check-in',     name: 'checkin',  component: CheckIn,
     meta: { requiresAuth: true, roles: ALL_ADMIN } },
   { path: '/past-events',  name: 'past',     component: PastEvents },

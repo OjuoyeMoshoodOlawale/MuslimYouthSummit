@@ -54,10 +54,12 @@ export const ticketQRData = (uniqueNumber, baseUrl) => {
 };
 
 /**
- * Tag QR data — links to the check-in page with the tag number.
- * When scanned, the check-in page looks up WHOEVER is currently assigned to
- * that tag and shows their live details.
+ * Tag QR data — links to the public tag page /tag/:tagNumber.
+ * When scanned, the page shows the assigned participant's details, or
+ * "not assigned yet" if the tag hasn't been given to anyone. Tags are
+ * printed blank and assigned to a person at the gate; the QR always
+ * resolves to whoever is currently assigned.
  */
 export const tagQRData = (tagNumber, eventId, baseUrl) => {
-  return `${baseUrl || process.env.FRONTEND_URL}/check-in?tag=${tagNumber}&event=${eventId}`;
+  return `${baseUrl || process.env.FRONTEND_URL}/tag/${tagNumber}`;
 };
