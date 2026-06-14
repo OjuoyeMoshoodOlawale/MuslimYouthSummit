@@ -14,6 +14,7 @@
     "setup:demo": "node scripts/setup-demo.js",
     "setup": "node scripts/setup-demo.js",
     "setup:tenant": "node scripts/setup-tenant.js",
+    "test:tenant": "node scripts/test-tenant-isolation.js",
     "test:email": "node scripts/test-email.js"
   },
   "dependencies": {

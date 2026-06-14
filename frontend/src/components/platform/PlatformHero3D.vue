@@ -14,7 +14,7 @@ const emit = defineEmits(['select-node']);
 
 const mount = ref(null);
 let renderer, scene, camera, frameId, raycaster, pointer;
-let hub, nodeGroup, starField;
+let hub, nodeGroup, starField, linkGroup;
 const nodeMeshes = [];
 let hovered = null;
 const target = { x: 0, y: 0 };          // mouse parallax target
@@ -69,6 +69,8 @@ const init = () => {
   // ── Orbiting tenant nodes ──
   nodeGroup = new THREE.Group();
   scene.add(nodeGroup);
+  linkGroup = new THREE.Group();
+  scene.add(linkGroup);
   buildNodes();
 
   // ── Starfield ──
@@ -103,6 +105,7 @@ const buildNodes = () => {
   // Clear existing
   nodeMeshes.length = 0;
   while (nodeGroup.children.length) nodeGroup.remove(nodeGroup.children[0]);
+  if (linkGroup) while (linkGroup.children.length) linkGroup.remove(linkGroup.children[0]);
 
   const list = props.nodes.length ? props.nodes : [
     { slug: 'mys', name: 'Muslim Youth Summit', color_secondary: '#FEC700' },
@@ -134,6 +137,14 @@ const buildNodes = () => {
 
     nodeGroup.add(mesh);
     nodeMeshes.push(mesh);
+
+    // Connecting line hub → node (positions updated each frame in animate)
+    const lineGeo = new THREE.BufferGeometry();
+    lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+    const lineMat = new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.28 });
+    const line = new THREE.Line(lineGeo, lineMat);
+    line.userData = { node: mesh };
+    linkGroup.add(line);
   });
 };
 
@@ -181,6 +192,20 @@ const animate = () => {
     m.position.y = m.userData.yOff + Math.sin(t * 1.2 + i) * 0.4;
     m.rotation.y = t * 0.6;
   });
+
+  // Connecting-line web: hub centre → each node, with a travelling pulse
+  if (linkGroup) {
+    linkGroup.children.forEach((line, i) => {
+      const node = line.userData.node;
+      if (!node) return;
+      const pos = line.geometry.attributes.position;
+      pos.setXYZ(0, 0, 0, 0);                                   // hub centre
+      pos.setXYZ(1, node.position.x, node.position.y, node.position.z);
+      pos.needsUpdate = true;
+      // Pulse opacity so energy seems to flow outward
+      line.material.opacity = 0.16 + (Math.sin(t * 2 + i * 0.9) * 0.5 + 0.5) * 0.28;
+    });
+  }
 
   // Hover detection
   if (raycaster && camera) {
