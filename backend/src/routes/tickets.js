@@ -42,6 +42,61 @@ router.get('/by-number/:num', authenticate, async (req, res, next) => {
   req.params.uniqueNumber = num;
   return getTicket(req, res, next);
 });
+/* ── Certificate (printable HTML) ───────────────────────────── */
+router.get('/certificate/:ref', async (req, res, next) => {
+  try {
+    let ref = (req.params.ref || '').trim().toUpperCase();
+
+    // Resolve TAG number → ticket unique_number
+    if (/^TAG-/i.test(ref)) {
+      const [tagRows] = await query(
+        `SELECT t.unique_number FROM event_tags et
+         JOIN tickets t ON t.id = et.ticket_id
+         WHERE et.tag_number = ? LIMIT 1`, [ref]
+      );
+      if (tagRows.length) ref = tagRows[0].unique_number;
+    }
+
+    const [rows] = await query(
+      `SELECT t.unique_number,
+              p.name AS participant_name,
+              e.title AS event_title, e.edition, e.status AS event_status,
+              e.start_date AS event_start_date, e.end_date, e.venue AS event_venue
+       FROM tickets t
+       JOIN participants p ON p.id = t.participant_id
+       JOIN events e       ON e.id = t.event_id
+       WHERE t.unique_number = ? AND t.status = 'paid'`,
+      [ref]
+    );
+
+    if (!rows.length) return err(res, 'No ticket found for that number. Check and try again.', 404);
+
+    const cert = rows[0];
+
+    // Admin preview bypass — a valid admin token (header or ?token query) can
+    // view the certificate at any time for cross-checking, even before the event ends.
+    let isAdmin = false;
+    try {
+      const hdr = req.headers.authorization;
+      const tok = (hdr && hdr.startsWith('Bearer ')) ? hdr.split(' ')[1] : req.query.token;
+      if (tok) {
+        const decoded = jwt.verify(tok, process.env.JWT_SECRET);
+        if (decoded?.id) isAdmin = true;
+      }
+    } catch { /* invalid/expired token → treat as public visitor */ }
+
+    // Participants: certificate available once the event is completed OR ended
+    const endPassed = cert.end_date && new Date(cert.end_date) < new Date();
+    const isReady   = cert.event_status === 'completed' || endPassed;
+
+    if (!isAdmin && !isReady) {
+      return err(res, 'Your certificate will be available after the event has concluded.', 403);
+    }
+
+    ok(res, { ...cert, preview: isAdmin && !isReady });
+  } catch (e) { next(e); }
+});
+
 router.get('/:uniqueNumber', getTicket);
 
 // ── Manual registration (admin / department staff) ─────────────
@@ -140,57 +195,3 @@ router.post('/manual', authenticate, authorize('super_admin','admin','department
 
 export default router;
 
-/* ── Certificate (printable HTML) ───────────────────────────── */
-router.get('/certificate/:ref', async (req, res, next) => {
-  try {
-    let ref = (req.params.ref || '').trim().toUpperCase();
-
-    // Resolve TAG number → ticket unique_number
-    if (/^TAG-/i.test(ref)) {
-      const [tagRows] = await query(
-        `SELECT t.unique_number FROM event_tags et
-         JOIN tickets t ON t.id = et.ticket_id
-         WHERE et.tag_number = ? LIMIT 1`, [ref]
-      );
-      if (tagRows.length) ref = tagRows[0].unique_number;
-    }
-
-    const [rows] = await query(
-      `SELECT t.unique_number,
-              p.name AS participant_name,
-              e.title AS event_title, e.edition, e.status AS event_status,
-              e.start_date AS event_start_date, e.end_date, e.venue AS event_venue
-       FROM tickets t
-       JOIN participants p ON p.id = t.participant_id
-       JOIN events e       ON e.id = t.event_id
-       WHERE t.unique_number = ? AND t.status = 'paid'`,
-      [ref]
-    );
-
-    if (!rows.length) return err(res, 'No ticket found for that number. Check and try again.', 404);
-
-    const cert = rows[0];
-
-    // Admin preview bypass — a valid admin token (header or ?token query) can
-    // view the certificate at any time for cross-checking, even before the event ends.
-    let isAdmin = false;
-    try {
-      const hdr = req.headers.authorization;
-      const tok = (hdr && hdr.startsWith('Bearer ')) ? hdr.split(' ')[1] : req.query.token;
-      if (tok) {
-        const decoded = jwt.verify(tok, process.env.JWT_SECRET);
-        if (decoded?.id) isAdmin = true;
-      }
-    } catch { /* invalid/expired token → treat as public visitor */ }
-
-    // Participants: certificate available once the event is completed OR ended
-    const endPassed = cert.end_date && new Date(cert.end_date) < new Date();
-    const isReady   = cert.event_status === 'completed' || endPassed;
-
-    if (!isAdmin && !isReady) {
-      return err(res, 'Your certificate will be available after the event has concluded.', 403);
-    }
-
-    ok(res, { ...cert, preview: isAdmin && !isReady });
-  } catch (e) { next(e); }
-});
