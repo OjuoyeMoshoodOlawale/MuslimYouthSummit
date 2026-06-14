@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { query } from '../database/db.js';
 import { success, error, notFound, created } from '../utils/response.js';
+import { stampId, tenantWhere } from '../utils/tenantScope.js';
 
 /* ── Login ────────────────────────────────────────────────── */
 export const login = async (req, res, next) => {
@@ -78,13 +79,20 @@ export const createAdmin = async (req, res, next) => {
     if (role === 'department' && !department_id)
       return error(res, 'A department must be assigned for department role.', 400);
 
-    const [existing] = await query('SELECT id FROM admins WHERE email = ?', [email.toLowerCase()]);
+    // New admins belong to the creating admin's tenant.
+    const tenantId = stampId(req);
+
+    // Email must be unique WITHIN the tenant (same email may exist in another).
+    const [existing] = await query(
+      'SELECT id FROM admins WHERE email = ? AND (tenant_id = ? OR (? IS NULL AND tenant_id IS NULL))',
+      [email.toLowerCase(), tenantId, tenantId]
+    );
     if (existing.length) return error(res, 'An account with this email already exists.', 409);
 
     const hash = await bcrypt.hash(password, 12);
     const [r] = await query(
-      'INSERT INTO admins (name, email, password, role, department_id) VALUES (?,?,?,?,?)',
-      [name.trim(), email.toLowerCase(), hash, role || 'admin', department_id || null]
+      'INSERT INTO admins (name, email, password, role, department_id, tenant_id) VALUES (?,?,?,?,?,?)',
+      [name.trim(), email.toLowerCase(), hash, role || 'admin', department_id || null, tenantId]
     );
     return created(res, { id: r.insertId }, 'Admin account created.');
   } catch (err) { next(err); }
@@ -93,12 +101,15 @@ export const createAdmin = async (req, res, next) => {
 /* ── List admins ───────────────────────────────────────────── */
 export const listAdmins = async (req, res, next) => {
   try {
+    const t = tenantWhere(req, 'a');
     const [rows] = await query(
       `SELECT a.id, a.name, a.email, a.role, a.is_active, a.department_id, a.created_at,
               d.name AS department_name
        FROM admins a
        LEFT JOIN departments d ON d.id = a.department_id
-       ORDER BY a.role, a.name`
+       WHERE 1=1${t.clause}
+       ORDER BY a.role, a.name`,
+      t.params
     );
     return success(res, rows);
   } catch (e) { next(e); }
