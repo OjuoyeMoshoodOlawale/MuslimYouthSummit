@@ -334,21 +334,18 @@ const pay = async () => {
     });
     const authData = data.data;
 
-    // 2. PRIMARY: redirect to Paystack's hosted checkout via authorization_url.
-    //    This is the most reliable path — it needs no public key in the browser,
-    //    never throws "Please enter a valid Key", and handles all card types.
-    //    Paystack will redirect back to our callback (/ticket/verify) after payment.
-    if (authData.authorization_url) {
-      window.location.href = authData.authorization_url;
-      return;
-    }
-
-    // 3. FALLBACK: inline popup (only if we somehow have no authorization_url
-    //    but do have a usable public key + access_code).
-    const publicKey = authData.public_key || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
-    if (authData.access_code && publicKey) {
+    // PRIMARY: inline popup — stays on this page (no redirect). Resumes the
+    // server-initialised transaction via access_code.
+    if (authData.access_code || authData.public_key) {
       try {
-        await openPaystackPopup(authData);
+        await openPaystackPopup({
+          access_code: authData.access_code,
+          reference:   authData.reference,
+          public_key:  authData.public_key || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
+          email:       form.email,
+          amount:      feeInfo.value.total,
+        });
+        // Paid — verify then go to the confirmation page
         processing.value = true;
         try { await api.get(`/tickets/verify/${authData.reference}`); } catch {}
         router.push(`/ticket/verify?reference=${authData.reference}`);
@@ -359,7 +356,14 @@ const pay = async () => {
           processing.value = false;
           return;
         }
+        // popup failed (script/key) → fall back to redirect below
       }
+    }
+
+    // FALLBACK: redirect to Paystack's hosted checkout.
+    if (authData.authorization_url) {
+      window.location.href = authData.authorization_url;
+      return;
     }
 
     throw new Error('Could not start the payment. Please try again or contact support.');

@@ -243,6 +243,7 @@ import {
   Loader, ShieldCheck, CheckCircle2, AlertCircle,
 } from 'lucide-vue-next';
 import { grossUpForPaystack } from '@/composables/usePaystackFees.js';
+import { openPaystackPopup } from '@/composables/usePaystackPopup.js';
 import api from '@/composables/useApi.js';
 
 const souvenirs = ref([]);
@@ -320,16 +321,49 @@ const submitOrder = async () => {
       ...buyForm,
       quantity: buyQty.value,
     });
-    const { payment_url, reference } = data.data || {};
+    const authData = data.data || {};
 
-    // PRIMARY: redirect to Paystack hosted checkout (no browser key needed,
-    // never throws "Please enter a valid Key", no duplicate-reference risk).
-    if (payment_url) {
-      window.location.href = payment_url;
+    // PRIMARY: inline popup — stays on this page (no redirect), like the
+    // ticket flow. Resumes the server-initialised transaction via access_code.
+    if (authData.access_code || authData.public_key) {
+      try {
+        await openPaystackPopup({
+          access_code: authData.access_code,
+          reference:   authData.reference,
+          public_key:  authData.public_key,
+          email:       buyForm.buyer_email,
+          amount:      authData.total || buyFees.value.total,
+        });
+        // Paid — verify on our backend, then show success inline
+        verifying.value = true;
+        try {
+          const { data: v } = await api.get(`/souvenirs/verify/${encodeURIComponent(authData.reference)}`);
+          if (v.data?.status === 'paid' || v.success) {
+            buyModal.value = false;
+            verifyResult.value = { ok: true, msg: 'Payment confirmed! Your order is placed. Check your email.' };
+          } else {
+            verifyResult.value = { ok: false, msg: 'Payment not completed. If charged, contact support.' };
+          }
+        } catch (e) {
+          verifyResult.value = { ok: false, msg: e.response?.data?.message || 'Could not verify. Contact support if charged.' };
+        } finally { verifying.value = false; }
+        return;
+      } catch (popupErr) {
+        if (popupErr.message === 'CLOSED') {
+          buyErr.value = 'Payment window closed. Click Buy to try again.';
+          buyBusy.value = false;
+          return;
+        }
+        // popup failed (script/key) → fall back to redirect below
+      }
+    }
+
+    // FALLBACK: redirect to hosted checkout if popup couldn't open
+    if (authData.payment_url) {
+      window.location.href = authData.payment_url;
       return;
     }
 
-    // Fallback only if no payment_url returned
     buyModal.value = false;
     showToast('Order placed! Check your email for payment details.');
   } catch (e) {
