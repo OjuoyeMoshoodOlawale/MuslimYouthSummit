@@ -3,6 +3,7 @@ import { sendTestEmail } from '../services/emailService.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { query } from '../database/db.js';
 import { success, created, error } from '../utils/response.js';
+import { tenantWhere, stampId } from '../utils/tenantScope.js';
 import { sendBulkCampaignEmails } from '../services/emailService.js';
 
 const router = express.Router();
@@ -28,11 +29,14 @@ router.post('/test', authenticate, authorize('super_admin','admin'), async (req,
 
 router.get('/campaigns', ...adm, async (req, res, next) => {
   try {
+    const t = tenantWhere(req, 'c');
     const [rows] = await query(
       `SELECT c.*, a.name AS created_by_name
        FROM email_campaigns c
        LEFT JOIN admins a ON a.id = c.created_by
-       ORDER BY c.created_at DESC`
+       WHERE 1=1${t.clause}
+       ORDER BY c.created_at DESC`,
+      t.params
     );
     success(res, rows);
   } catch (e) { next(e); }
@@ -45,9 +49,9 @@ router.post('/campaigns', ...adm, async (req, res, next) => {
     if (!subject?.trim()) return error(res, 'Subject is required.', 400);
     if (!body_html?.trim()) return error(res, 'Email body is required.', 400);
     const [r] = await query(
-      `INSERT INTO email_campaigns (event_id, subject, body_html, body_text, recipient_type, created_by)
-       VALUES (?,?,?,?,?,?)`,
-      [event_id || null, subject.trim(), body_html, body_text || null, recipient_type || 'all', req.admin.id]
+      `INSERT INTO email_campaigns (event_id, subject, body_html, body_text, recipient_type, created_by, tenant_id)
+       VALUES (?,?,?,?,?,?,?)`,
+      [event_id || null, subject.trim(), body_html, body_text || null, recipient_type || 'all', req.admin.id, stampId(req)]
     );
     created(res, { id: r.insertId }, 'Campaign saved as draft.');
   } catch (e) { next(e); }
