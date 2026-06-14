@@ -134,10 +134,25 @@
               <span>{{ serverError }}</span>
             </div>
 
+            <!-- Quantity selector -->
+            <div v-if="form.ticket_type_id" class="flex items-center justify-between bg-gray-50 border border-gray-100 p-4 rounded-lg">
+              <div>
+                <p class="font-semibold text-gray-800 text-sm">Number of tickets</p>
+                <p class="text-xs text-gray-400">Buying for a group? Add more.</p>
+              </div>
+              <div class="flex items-center gap-3">
+                <button type="button" class="w-9 h-9 border border-gray-200 rounded-lg flex items-center justify-center hover:bg-gray-100 text-lg font-bold disabled:opacity-40"
+                  :disabled="form.quantity <= 1" @click="form.quantity = Math.max(1, form.quantity - 1)">–</button>
+                <span class="font-display font-bold text-xl text-brand-green w-8 text-center">{{ form.quantity }}</span>
+                <button type="button" class="w-9 h-9 border border-gray-200 rounded-lg flex items-center justify-center hover:bg-gray-100 text-lg font-bold disabled:opacity-40"
+                  :disabled="form.quantity >= 20" @click="form.quantity = Math.min(20, form.quantity + 1)">+</button>
+              </div>
+            </div>
+
             <!-- Fee breakdown -->
             <div v-if="selectedPrice > 0" class="bg-brand-cream border border-brand-gold/30 p-4 space-y-2">
               <div class="flex justify-between text-sm">
-                <span class="text-gray-600">Ticket price</span>
+                <span class="text-gray-600">Ticket price <span v-if="form.quantity > 1" class="text-gray-400">× {{ form.quantity }}</span></span>
                 <span class="font-semibold text-gray-800">{{ fmtNaira(feeInfo.subtotal) }}</span>
               </div>
               <div class="flex justify-between text-sm">
@@ -206,6 +221,7 @@ const { form, errs, saving: _saving, serverError: _se, handleSubmit, validate, r
   name: '', email: '', phone: '', gender: '', occupation: '',
   ticket_type_id: route.query.type ? Number(route.query.type) : null,
   category_id: null,
+  quantity: 1,
 }, {
   name:  v.required('Full name'),
   email: v.email(),
@@ -255,7 +271,7 @@ const selectedPrice = computed(() => {
 });
 
 const fmtP       = (n) => Number(n || 0).toLocaleString('en-NG');
-const feeInfo    = computed(() => grossUpForPaystack(selectedPrice.value));
+const feeInfo    = computed(() => grossUpForPaystack(selectedPrice.value * (form.quantity || 1)));
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-NG',{day:'numeric',month:'long',year:'numeric'}) : '';
 
 // Validation handled by useForm

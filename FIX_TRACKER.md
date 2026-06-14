@@ -62,6 +62,13 @@ super_admin/admin and 403s for attendants; OR a route guard blocks attendants.
 ---
 
 ## NEXT BATCH — doing all, in order
-- [ ] TASK A: Verify the 3 fixes (logic review + edge cases)
-- [ ] TASK B: True multi-ticket purchase (buy N tickets in one payment, quantity selector)
-- [ ] TASK C: Continue multi-tenant branch (scope controllers, slug routing, branding)
+- [x] TASK A: Verify the 3 fixes + hardened ticket number collisions ✅
+- [x] TASK B: True multi-ticket purchase (quantity selector, one payment) ✅
+- [ ] TASK C: Continue multi-tenant branch
+
+### TASK B details
+- tickets.quantity column added (schema + migrate.sql)
+- initiate: accepts quantity (1-20), price × quantity, capacity check for batch,
+  returns quantity + unit_price
+- verify: increments quantity_sold by ticket.quantity
+- frontend: quantity stepper on RegisterTicket, feeInfo × quantity, sent via form
