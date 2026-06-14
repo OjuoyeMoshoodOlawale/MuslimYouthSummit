@@ -6,7 +6,7 @@
       :class="scrolled ? 'bg-brand-green shadow-lg' : 'bg-gradient-to-b from-black/40 to-transparent'">
       <div class="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-4">
         <button @click="scrollTo('top')">
-          <img src="/logos/logo-white.png" alt="MYS" class="h-9" />
+          <img :src="orgLogo" :alt="orgName" class="h-9" />
         </button>
         <!-- Desktop nav -->
         <div class="hidden md:flex items-center gap-6 text-white/80 text-sm font-semibold">
@@ -76,7 +76,7 @@
         <div class="float-anim inline-block"
           :class="heroStep>=1?'opacity-100 translate-y-0':'opacity-0 -translate-y-8'"
           style="transition:all 0.7s cubic-bezier(0.16,1,0.3,1)">
-          <img src="/logos/logo-white.png" alt="MYS" class="h-20 md:h-32 mx-auto drop-shadow-2xl" />
+          <img :src="orgLogo" :alt="orgName" class="h-20 md:h-32 mx-auto drop-shadow-2xl" />
         </div>
 
         <!-- Active event badge -->
@@ -97,7 +97,7 @@
           :class="heroStep>=3?'opacity-100 translate-y-0':'opacity-0 translate-y-8'"
           style="transition:all 0.7s cubic-bezier(0.16,1,0.3,1) 0.1s">
           <span class="bg-gradient-to-r from-white via-white/95 to-white/70 bg-clip-text text-transparent">
-            {{ eventStore.hasActiveEvent ? eventStore.activeEvent.title : 'Muslim Youth Summit' }}
+            {{ eventStore.hasActiveEvent ? eventStore.activeEvent.title : orgName }}
           </span>
         </h1>
 
@@ -436,7 +436,7 @@
             <p class="text-brand-gold font-bold text-xs uppercase tracking-[0.3em] mb-3 flex items-center gap-2">
               <ShoppingBag :size="13" /> Merchandise Store
             </p>
-            <h2 class="font-display font-bold text-3xl text-white">MYS Souvenirs</h2>
+            <h2 class="font-display font-bold text-3xl text-white">{{ orgName }} Souvenirs</h2>
             <p class="text-white/60 mt-1 text-sm">Exclusive pre-order merchandise</p>
           </div>
           <RouterLink to="/shop" class="btn-gold text-xs flex items-center gap-2">
@@ -505,7 +505,7 @@
       <div class="max-w-7xl mx-auto px-4 md:px-6">
         <div class="flex flex-col md:flex-row items-start justify-between gap-8 md:gap-10 pb-8 border-b border-white/10">
           <div class="max-w-xs">
-            <img src="/logos/logo-white.png" alt="MYS" class="h-10 md:h-12 mb-4" />
+            <img :src="orgLogo" :alt="orgName" class="h-10 md:h-12 mb-4" />
             <p class="text-white/45 text-sm leading-relaxed">
               {{ eventStore.hasActiveEvent && eventStore.activeEvent?.tagline
                 ? eventStore.activeEvent.tagline
@@ -537,7 +537,7 @@
           </div>
         </div>
         <div class="flex flex-col md:flex-row items-center justify-between gap-3 pt-5 text-white/25 text-xs">
-          <p>© {{ new Date().getFullYear() }} Muslim Youth Summit. All rights reserved.</p>
+          <p>© {{ new Date().getFullYear() }} {{ orgName }}. All rights reserved.</p>
           <p class="flex items-center gap-1.5"><Heart :size="11" class="text-brand-gold" /> Built with purpose</p>
         </div>
       </div>
@@ -554,6 +554,7 @@ import {
   Briefcase, Users, GraduationCap, Youtube, ShoppingBag, Handshake,
 } from 'lucide-vue-next';
 import { useEventStore }   from '@/stores/eventStore.js';
+import { useTenantStore }  from '@/stores/tenantStore.js';
 import { useScrollReveal } from '@/composables/useScrollReveal.js';
 import CountdownTimer  from '@/components/landing/CountdownTimer.vue';
 import SpeakerCard     from '@/components/landing/SpeakerCard.vue';
@@ -563,6 +564,9 @@ import api from '@/composables/useApi.js';
 
 const router     = useRouter();
 const eventStore = useEventStore();
+const tenantStore = useTenantStore();
+const orgName = computed(() => tenantStore.tenant?.name || 'Muslim Youth Summit');
+const orgLogo = computed(() => tenantStore.tenant?.logo_url || '/logos/logo-white.png');
 const { setupReveal } = useScrollReveal();
 
 const scrolled       = ref(false);
