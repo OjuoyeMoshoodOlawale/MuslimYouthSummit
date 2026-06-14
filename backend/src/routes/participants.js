@@ -3,6 +3,7 @@ import { authenticate, authorize } from '../middleware/auth.js';
 import { query } from '../database/db.js';
 import { paginated, buildPagination, success } from '../utils/response.js';
 import { parsePagination } from '../utils/helpers.js';
+import { tenantWhere } from '../utils/tenantScope.js';
 
 const router = express.Router();
 const adm = [authenticate, authorize('super_admin','admin')];
@@ -31,6 +32,10 @@ router.get('/participants', authenticate, async (req, res, next) => {
       const q = `%${search}%`;
       params.push(q, q, q, q);
     }
+    // Tenant isolation: only this tenant's participants
+    const tScope = tenantWhere(req, 'p');
+    where += tScope.clause;
+    params.push(...tScope.params);
 
     const [[{ total }]] = await query(
       `SELECT COUNT(DISTINCT p.id) AS total FROM participants p ${joins} ${where}`, params

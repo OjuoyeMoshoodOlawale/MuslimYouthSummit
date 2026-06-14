@@ -4,6 +4,7 @@ import { query } from '../database/db.js';
 import { success, created, error, notFound } from '../utils/response.js';
 import { initializeTransaction, verifyTransaction } from '../services/paystackService.js';
 import { grossUpForPaystack } from '../utils/paystackFees.js';
+import { tenantWhere, stampId } from '../utils/tenantScope.js';
 
 const router = express.Router();
 const adm    = [authenticate, authorize('super_admin', 'admin')];
@@ -18,6 +19,9 @@ router.get('/souvenirs', async (req, res, next) => {
       where += ' AND (s.event_id = ? OR s.event_id IS NULL)';
       params.push(event_id);
     }
+    const tScope = tenantWhere(req, 's');
+    where += tScope.clause;
+    params.push(...tScope.params);
     const [rows] = await query(
       `SELECT s.*,
               e.title AS event_title, e.edition,
