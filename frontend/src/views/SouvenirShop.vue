@@ -64,12 +64,19 @@
                 {{ sv.available_qty - sv.sold_qty }} left
               </p>
             </div>
-            <button class="w-full mt-3 btn-gold text-xs py-2.5 justify-center"
-              :disabled="sv.available_qty!==null && sv.sold_qty>=sv.available_qty"
-              @click="openBuy(sv)">
-              <ShoppingCart :size="13" />
-              {{ sv.available_qty!==null && sv.sold_qty>=sv.available_qty ? 'Out of Stock' : 'Buy Now' }}
-            </button>
+            <div class="grid grid-cols-2 gap-2 mt-3">
+              <button class="btn-outline text-xs py-2.5 justify-center"
+                :disabled="sv.available_qty!==null && sv.sold_qty>=sv.available_qty"
+                @click="addToCart(sv)">
+                <ShoppingCart :size="13" />
+                Add to Cart
+              </button>
+              <button class="btn-gold text-xs py-2.5 justify-center"
+                :disabled="sv.available_qty!==null && sv.sold_qty>=sv.available_qty"
+                @click="buyNow(sv)">
+                {{ sv.available_qty!==null && sv.sold_qty>=sv.available_qty ? 'Sold Out' : 'Buy Now' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -374,7 +381,31 @@ const submitOrder = async () => {
 /* Cart helpers */
 const updateQty = (id,qty) => { if(qty<1){removeFromCart(id);return;} const i=cart.value.find(x=>x.id===id); if(i){i.qty=qty;saveCart();} };
 const removeFromCart = (id) => { cart.value=cart.value.filter(i=>i.id!==id); saveCart(); };
-const checkoutCart = () => { cartOpen.value=false; if(cart.value.length) openBuy(cart.value[0]); };
+const checkoutCart = () => {
+  if (!cart.value.length) return;
+  cartOpen.value = false;
+  // Open the buy modal for the first cart item, pre-filling its quantity.
+  const first = cart.value[0];
+  const sv = souvenirs.value.find(s => s.id === first.id) || first;
+  openBuy(sv);
+  buyQty.value = first.qty || 1;
+  if (cart.value.length > 1) {
+    buyErr.value = 'Note: checkout processes one product at a time. Complete this purchase, then check out the next item.';
+  }
+};
+
+const addToCart = (sv) => {
+  const existing = cart.value.find(i => i.id === sv.id);
+  if (existing) {
+    existing.qty += 1;
+  } else {
+    cart.value.push({ id: sv.id, name: sv.name, price: sv.price, image_url: sv.image_url, qty: 1 });
+  }
+  saveCart();
+  showToast(`${sv.name} added to cart`);
+};
+
+const buyNow = (sv) => openBuy(sv);
 </script>
 
 <style scoped>
