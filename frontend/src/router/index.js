@@ -38,6 +38,7 @@ const AdminSettings       = () => import('@/views/admin/AdminSettings.vue');
 const AdminSouvenirs      = () => import('@/views/admin/AdminSouvenirs.vue');
 const AdminSponsors       = () => import('@/views/admin/AdminSponsors.vue');
 const AdminMediaUpload    = () => import('@/views/admin/AdminMediaUpload.vue');
+const AdminTenantBranding = () => import('@/views/admin/AdminTenantBranding.vue');
 
 const PlatformLogin       = () => import('@/views/platform/PlatformLogin.vue');
 const PlatformDashboard   = () => import('@/views/platform/PlatformDashboard.vue');
