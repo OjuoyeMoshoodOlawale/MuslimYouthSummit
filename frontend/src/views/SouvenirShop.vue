@@ -92,21 +92,43 @@
       <div v-if="buyModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="buyModal=false"></div>
         <div class="relative bg-white w-full max-w-md shadow-2xl overflow-y-auto max-h-[90vh]">
-          <!-- Product header -->
+          <!-- Header -->
           <div class="bg-brand-green text-white p-5 flex items-center gap-4">
-            <img v-if="buying?.image_url" :src="buying?.image_url" :alt="buying?.name"
-              class="w-14 h-14 object-cover flex-shrink-0" />
-            <div class="min-w-0">
-              <p class="font-display font-bold text-lg leading-tight">{{ buying?.name }}</p>
-              <p class="text-brand-gold font-bold">₦{{ fmtP(buying?.price) }}</p>
-            </div>
+            <template v-if="cartMode">
+              <ShoppingCart :size="28" class="flex-shrink-0 text-brand-gold" />
+              <div class="min-w-0">
+                <p class="font-display font-bold text-lg leading-tight">Checkout Cart</p>
+                <p class="text-brand-gold font-bold text-sm">{{ cartCount }} item{{ cartCount>1?'s':'' }} · ₦{{ fmtP(cartTotal) }}</p>
+              </div>
+            </template>
+            <template v-else>
+              <img v-if="buying?.image_url" :src="buying?.image_url" :alt="buying?.name"
+                class="w-14 h-14 object-cover flex-shrink-0" />
+              <div class="min-w-0">
+                <p class="font-display font-bold text-lg leading-tight">{{ buying?.name }}</p>
+                <p class="text-brand-gold font-bold">₦{{ fmtP(buying?.price) }}</p>
+              </div>
+            </template>
             <button class="ml-auto text-white/60 hover:text-white flex-shrink-0" @click="buyModal=false">
               <X :size="20" />
             </button>
           </div>
 
-          <form @submit.prevent="submitOrder" class="p-5 space-y-4">
-            <div class="grid grid-cols-2 gap-4">
+          <form @submit.prevent="cartMode ? submitCartOrder() : submitOrder()" class="p-5 space-y-4">
+            <!-- Cart items list (cart mode) -->
+            <div v-if="cartMode" class="space-y-2 max-h-40 overflow-y-auto">
+              <div v-for="item in cart" :key="item.id" class="flex items-center gap-3 text-sm bg-gray-50 p-2 rounded">
+                <img v-if="item.image_url" :src="item.image_url" class="w-10 h-10 object-cover flex-shrink-0 rounded" />
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-gray-800 truncate">{{ item.name }}</p>
+                  <p class="text-xs text-gray-400">₦{{ fmtP(item.price) }} × {{ item.qty }}</p>
+                </div>
+                <p class="font-semibold text-brand-green">₦{{ fmtP(item.price * item.qty) }}</p>
+              </div>
+            </div>
+
+            <!-- Quantity (single-item mode only) -->
+            <div v-if="!cartMode" class="grid grid-cols-2 gap-4">
               <div>
                 <label class="label">Quantity</label>
                 <div class="flex items-center gap-2">
@@ -155,21 +177,21 @@
             <div class="bg-brand-cream border border-brand-gold/30 p-3 space-y-1.5 text-sm">
               <div class="flex justify-between">
                 <span class="text-gray-600">Item total</span>
-                <span class="font-semibold">₦{{ fmtP(buyFees.subtotal) }}</span>
+                <span class="font-semibold">₦{{ fmtP((cartMode ? cartFees : buyFees).subtotal) }}</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-gray-600">Processing fee <span class="text-xs text-gray-400">(Paystack)</span></span>
-                <span class="font-semibold text-gray-600">₦{{ fmtP(buyFees.fee) }}</span>
+                <span class="font-semibold text-gray-600">₦{{ fmtP((cartMode ? cartFees : buyFees).fee) }}</span>
               </div>
               <div class="flex justify-between pt-1.5 border-t border-brand-gold/20">
                 <span class="font-bold text-brand-green">Total to pay</span>
-                <span class="font-display font-bold text-brand-green">₦{{ fmtP(buyFees.total) }}</span>
+                <span class="font-display font-bold text-brand-green">₦{{ fmtP((cartMode ? cartFees : buyFees).total) }}</span>
               </div>
             </div>
 
             <button type="submit" :disabled="buyBusy" class="btn-gold w-full justify-center py-3.5 text-base">
               <component :is="buyBusy ? Loader : CreditCard" :size="16" :class="buyBusy?'animate-spin':''" />
-              {{ buyBusy ? 'Processing…' : `Pay ₦${fmtP(buyFees.total)} with Paystack` }}
+              {{ buyBusy ? 'Processing…' : `Pay ₦${fmtP((cartMode ? cartFees : buyFees).total)} with Paystack` }}
             </button>
             <p class="text-center text-xs text-gray-400 flex items-center justify-center gap-1.5">
               <ShieldCheck :size="13" class="text-green-500" />
@@ -271,6 +293,7 @@ const cart = ref(JSON.parse(sessionStorage.getItem('mys_cart') || '[]'));
 const saveCart = () => sessionStorage.setItem('mys_cart', JSON.stringify(cart.value));
 const cartCount = computed(() => cart.value.reduce((s,i)=>s+i.qty,0));
 const cartTotal = computed(() => cart.value.reduce((s,i)=>s+(i.price*i.qty),0));
+const cartFees  = computed(() => grossUpForPaystack(cartTotal.value));
 
 const route = useRoute();
 
@@ -309,6 +332,7 @@ const verifyResult = ref(null);
 const showToast = (msg) => { toast.value=msg; setTimeout(()=>{toast.value='';},2500); };
 
 const openBuy = (sv) => {
+  cartMode.value = false;
   buying.value = sv;
   buyQty.value = 1;
   buyErr.value = '';
@@ -381,17 +405,75 @@ const submitOrder = async () => {
 /* Cart helpers */
 const updateQty = (id,qty) => { if(qty<1){removeFromCart(id);return;} const i=cart.value.find(x=>x.id===id); if(i){i.qty=qty;saveCart();} };
 const removeFromCart = (id) => { cart.value=cart.value.filter(i=>i.id!==id); saveCart(); };
+const cartMode = ref(false);
+
 const checkoutCart = () => {
   if (!cart.value.length) return;
   cartOpen.value = false;
-  // Open the buy modal for the first cart item, pre-filling its quantity.
-  const first = cart.value[0];
-  const sv = souvenirs.value.find(s => s.id === first.id) || first;
-  openBuy(sv);
-  buyQty.value = first.qty || 1;
-  if (cart.value.length > 1) {
-    buyErr.value = 'Note: checkout processes one product at a time. Complete this purchase, then check out the next item.';
-  }
+  cartMode.value = true;
+  buying.value = null;
+  buyErr.value = '';
+  Object.assign(buyErrs, { name:'', email:'' });
+  buyModal.value = true;
+};
+
+// Submit the whole cart as ONE order / ONE payment
+const submitCartOrder = async () => {
+  buyErrs.name  = buyForm.buyer_name.trim() ? '' : 'Name is required.';
+  buyErrs.email = /\S+@\S+\.\S+/.test(buyForm.buyer_email) ? '' : 'Valid email required.';
+  if (buyErrs.name || buyErrs.email) return;
+  if (!cart.value.length) { buyErr.value = 'Your cart is empty.'; return; }
+
+  buyBusy.value = true; buyErr.value = '';
+  try {
+    const { data } = await api.post('/souvenirs/cart/order', {
+      buyer_name:       buyForm.buyer_name,
+      buyer_email:      buyForm.buyer_email,
+      buyer_phone:      buyForm.buyer_phone,
+      delivery_address: buyForm.delivery_address,
+      notes:            buyForm.notes,
+      items:            cart.value.map(i => ({ id: i.id, quantity: i.qty })),
+    });
+    const authData = data.data || {};
+
+    if (authData.access_code || authData.public_key) {
+      try {
+        await openPaystackPopup({
+          access_code: authData.access_code,
+          reference:   authData.reference,
+          public_key:  authData.public_key,
+          email:       buyForm.buyer_email,
+          amount:      authData.total || cartFees.value.total,
+        });
+        verifying.value = true;
+        try {
+          const { data: v } = await api.get(`/souvenirs/verify/${encodeURIComponent(authData.reference)}`);
+          if (v.data?.status === 'paid' || v.success) {
+            buyModal.value = false; cartMode.value = false;
+            cart.value = []; saveCart();          // empty the cart on success
+            verifyResult.value = { ok: true, msg: 'Payment confirmed! Your order is placed. Check your email.' };
+          } else {
+            verifyResult.value = { ok: false, msg: 'Payment not completed. If charged, contact support.' };
+          }
+        } catch (e) {
+          verifyResult.value = { ok: false, msg: e.response?.data?.message || 'Could not verify. Contact support if charged.' };
+        } finally { verifying.value = false; }
+        return;
+      } catch (popupErr) {
+        if (popupErr.message === 'CLOSED') {
+          buyErr.value = 'Payment window closed. Click Pay to try again.';
+          buyBusy.value = false;
+          return;
+        }
+      }
+    }
+
+    if (authData.payment_url) { window.location.href = authData.payment_url; return; }
+    buyModal.value = false;
+    showToast('Order placed! Check your email for payment details.');
+  } catch (e) {
+    buyErr.value = e.response?.data?.message || 'Checkout failed. Please try again.';
+  } finally { buyBusy.value = false; }
 };
 
 const addToCart = (sv) => {

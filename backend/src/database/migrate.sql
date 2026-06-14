@@ -163,4 +163,35 @@ CALL AddIndexIfNotExists('expense_requests','idx_expenses_dept','department_id, 
 
 DROP PROCEDURE IF EXISTS AddIndexIfNotExists;
 
+-- ─────────────────────────────────────────────────────────────
+-- Multi-item cart checkout: souvenir_orders.paystack_reference must NOT be
+-- unique (a cart shares one reference across several order rows).
+-- Drop the unique index if it exists.
+-- ─────────────────────────────────────────────────────────────
+DELIMITER $$
+DROP PROCEDURE IF EXISTS DropUniqueRefIfExists$$
+CREATE PROCEDURE DropUniqueRefIfExists()
+BEGIN
+  DECLARE idxName VARCHAR(128) DEFAULT NULL;
+  SELECT index_name INTO idxName
+    FROM information_schema.STATISTICS
+    WHERE table_schema = DATABASE()
+      AND table_name = 'souvenir_orders'
+      AND column_name = 'paystack_reference'
+      AND non_unique = 0
+    LIMIT 1;
+  IF idxName IS NOT NULL THEN
+    SET @sql = CONCAT('ALTER TABLE souvenir_orders DROP INDEX ', idxName);
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+  END IF;
+END$$
+DELIMITER ;
+CALL DropUniqueRefIfExists();
+DROP PROCEDURE IF EXISTS DropUniqueRefIfExists;
+
+-- Add a non-unique index for lookup performance
+CREATE INDEX IF NOT EXISTS idx_souvenir_ref ON souvenir_orders(paystack_reference);
+
 SELECT 'Migration complete!' AS result;

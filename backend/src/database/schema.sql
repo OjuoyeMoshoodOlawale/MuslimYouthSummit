@@ -414,7 +414,7 @@ CREATE TABLE IF NOT EXISTS souvenir_orders (
   unit_price         DECIMAL(10,2) NOT NULL,
   total_amount       DECIMAL(10,2) NOT NULL,
   status             ENUM('pending','paid','cancelled','delivered') NOT NULL DEFAULT 'pending',
-  paystack_reference VARCHAR(100) UNIQUE NULL,
+  paystack_reference VARCHAR(100) NULL COMMENT 'shared across rows for multi-item cart orders',
   delivery_address   TEXT NULL,
   notes              TEXT NULL,
   created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

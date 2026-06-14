@@ -87,6 +87,79 @@ router.delete('/souvenirs/:id', ...adm, async (req, res, next) => {
 });
 
 /* ── Public: initiate souvenir purchase ─────────────────────── */
+/* ── Public: multi-item CART checkout (one payment for many products) ──────── */
+router.post('/souvenirs/cart/order', async (req, res, next) => {
+  try {
+    const { buyer_name, buyer_email, buyer_phone, delivery_address, notes, items } = req.body;
+
+    if (!buyer_name?.trim()) return error(res, 'Your name is required.', 400);
+    if (!buyer_email?.trim() || !/\S+@\S+\.\S+/.test(buyer_email))
+      return error(res, 'Valid email required.', 400);
+    if (!Array.isArray(items) || !items.length)
+      return error(res, 'Your cart is empty.', 400);
+
+    // Load & validate every item, compute the true total from DB prices
+    const lines = [];
+    let subtotal = 0;
+    for (const it of items) {
+      const qty = Math.max(1, parseInt(it.quantity || it.qty || 1));
+      const [rows] = await query('SELECT * FROM souvenirs WHERE id=? AND is_active=1', [it.id]);
+      if (!rows.length) return error(res, 'A product in your cart is no longer available.', 404);
+      const sv = rows[0];
+      if (sv.available_qty !== null && sv.sold_qty + qty > sv.available_qty)
+        return error(res, `Only ${sv.available_qty - sv.sold_qty} of "${sv.name}" left in stock.`, 409);
+      const unit = parseFloat(sv.price);
+      lines.push({ sv, qty, unit, line_total: unit * qty });
+      subtotal += unit * qty;
+    }
+
+    // Gross up the WHOLE cart once so the org receives the exact subtotal
+    const { total: chargeAmount } = grossUpForPaystack(subtotal);
+    const reference = `CART-${Date.now()}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
+
+    // One human-readable order number for the whole cart
+    const [[{ orderSeq }]] = await query('SELECT COUNT(*) + 1 AS orderSeq FROM souvenir_orders');
+    const yy = new Date().getFullYear().toString().slice(-2);
+    const order_number = `SVN-${yy}-${String(orderSeq).padStart(6,'0')}`;
+
+    // One order row PER line item, all sharing the same reference & order_number
+    const orderIds = [];
+    for (const ln of lines) {
+      const [r] = await query(
+        `INSERT INTO souvenir_orders
+           (order_number, souvenir_id, buyer_name, buyer_email, buyer_phone, quantity, unit_price,
+            total_amount, status, paystack_reference, delivery_address, notes)
+         VALUES (?,?,?,?,?,?,?,?,'pending',?,?,?)`,
+        [order_number, ln.sv.id, buyer_name.trim(), buyer_email.toLowerCase(), buyer_phone || null,
+         ln.qty, ln.unit, ln.line_total, reference,
+         delivery_address || null, notes || null]
+      );
+      orderIds.push(r.insertId);
+    }
+
+    const payData = await initializeTransaction({
+      email:        buyer_email.toLowerCase(),
+      amount:       Math.round(chargeAmount * 100),
+      reference,
+      metadata:     { order_number, item_count: lines.length, buyer_name, cart: true },
+      callback_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/shop/verify?ref=${reference}`,
+    });
+
+    created(res, {
+      order_number,
+      order_ids:    orderIds,
+      reference,
+      payment_url:  payData.authorization_url,
+      access_code:  payData.access_code,
+      public_key:   process.env.PAYSTACK_PUBLIC_KEY,
+      subtotal,
+      total:        chargeAmount,
+      fee:          chargeAmount - subtotal,
+      item_count:   lines.length,
+    }, 'Cart order placed. Complete payment to confirm.');
+  } catch (e) { next(e); }
+});
+
 router.post('/souvenirs/:id/order', async (req, res, next) => {
   try {
     const { buyer_name, buyer_email, buyer_phone, quantity = 1, delivery_address, notes } = req.body;
@@ -161,20 +234,33 @@ router.get('/souvenirs/verify/:reference', async (req, res, next) => {
        WHERE o.paystack_reference=?`, [reference]
     );
     if (!orders.length) return notFound(res, 'Order');
-    const order = orders[0];
-    if (order.status === 'paid') return success(res, order, 'Already confirmed.');
+
+    // All rows for this reference (1 for single item, N for a cart)
+    const alreadyPaid = orders.every(o => o.status === 'paid');
+    if (alreadyPaid) {
+      return success(res, { ...orders[0], status: 'paid', items: orders }, 'Already confirmed.');
+    }
 
     const verData = await verifyTransaction(reference);
     if (verData.status !== 'success')
       return error(res, 'Payment not confirmed yet.', 402);
 
-    // Mark paid
+    // Mark ALL rows for this reference paid, and increment each souvenir's stock
     await query(
       "UPDATE souvenir_orders SET status='paid', paid_at=NOW() WHERE paystack_reference=?", [reference]
     );
-    await query('UPDATE souvenirs SET sold_qty=sold_qty+? WHERE id=?', [order.quantity, order.souvenir_id]);
+    for (const o of orders) {
+      await query('UPDATE souvenirs SET sold_qty=sold_qty+? WHERE id=?', [o.quantity, o.souvenir_id]);
+    }
 
-    success(res, { ...order, status: 'paid' }, `Payment confirmed! Your order is being processed.`);
+    const grandTotal = orders.reduce((s, o) => s + parseFloat(o.total_amount), 0);
+    success(res, {
+      ...orders[0],
+      status: 'paid',
+      items: orders,
+      item_count: orders.length,
+      grand_total: grandTotal,
+    }, `Payment confirmed! Your order is being processed.`);
   } catch (e) { next(e); }
 });
 
