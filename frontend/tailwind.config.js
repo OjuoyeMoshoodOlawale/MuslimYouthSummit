@@ -5,10 +5,10 @@ export default {
     extend: {
       colors: {
         brand: {
-          green: '#02462E',
-          gold: '#FEC700',
-          lightgreen: '#6BBC01',
-          cream: '#FBF6E6',
+          green: 'var(--brand-primary, #02462E)',
+          gold: 'var(--brand-secondary, #FEC700)',
+          lightgreen: 'var(--brand-accent, #6BBC01)',
+          cream: 'var(--brand-bg, #FBF6E6)',
         },
       },
       fontFamily: {

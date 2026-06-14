@@ -72,3 +72,20 @@ super_admin/admin and 403s for attendants; OR a route guard blocks attendants.
   returns quantity + unit_price
 - verify: increments quantity_sold by ticket.quantity
 - frontend: quantity stepper on RegisterTicket, feeInfo × quantity, sent via form
+
+### TASK C progress (multi-tenant-platform branch)
+DONE this session:
+- Merged main fixes into the branch
+- tenantStore.js: loads tenant by slug, applies branding as CSS vars, sets
+  X-Tenant-Slug header for all API calls
+- tailwind: brand colours now read CSS variables (var(--brand-primary) etc.)
+  with MYS defaults → whole app re-themes per tenant
+
+REMAINING (large, deliberate work — next sessions):
+- [ ] Router: /:slug, /:slug/admin, /:slug/register … + guard that loads tenant
+- [ ] Scope every controller query by req.tenant.id (events, participants,
+      tickets, tags, etc.) — the biggest piece, done incrementally per controller
+- [ ] Tenant admin: branding/colours/logo + custom pages UI in Settings
+- [ ] Platform admin dashboard: create/list/suspend tenants
+- [ ] Public branded landing per tenant (consume tenantStore)
+- [ ] Per-tenant Paystack wired into initiate (use resolvePaystackKeys)
