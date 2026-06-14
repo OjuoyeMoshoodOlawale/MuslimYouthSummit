@@ -83,13 +83,22 @@ DONE this session:
 
 REMAINING (large, deliberate work — next sessions):
 - [x] Router: /:slug, /:slug/admin, /:slug/register … + guard that loads tenant ✅
-- [x] Platform views: PlatformHome (tenant picker), PlatformLogin, PlatformDashboard
-      (create/list/suspend tenants), TenantPage (custom page renderer) ✅
-- [ ] ⚠️ NEXT CRITICAL: update hardcoded links in all components to include the
-      slug (e.g. RouterLink to="/admin/dashboard" → `/${slug}/admin/dashboard`).
-      Until done, in-app navigation will break under slug routing. Use a
-      useTenantLink() helper or inject slug from route.params.
-- [ ] Scope every controller query by req.tenant.id (events, participants, etc.)
-- [ ] Tenant admin: branding/colours/logo + custom pages UI in Settings
-- [ ] Public branded landing per tenant (consume tenantStore)
-- [ ] Per-tenant Paystack wired into initiate (use resolvePaystackKeys)
+- [x] Platform views: PlatformHome, PlatformLogin, PlatformDashboard, TenantPage ✅
+- [x] Slug-aware navigation (useTenantLink + router rescue redirect) ✅
+- [x] Scope controllers by tenant_id ✅ DONE:
+      events, participants, souvenirs, sponsors, hostels, departments,
+      email_campaigns, admins (create+list+login). ticket_types isolated
+      transitively via event_id. event_categories global by design.
+- [x] Tenant admin branding/colours/logo + custom pages UI (AdminTenantBranding) ✅
+- [x] Public branded landing consumes tenantStore (name/logo/colours) ✅
+- [x] Per-tenant Paystack wired into ticket + souvenir flows ✅
+
+FINAL STEP (needs a running DB — user action):
+- [ ] Run `node backend/scripts/setup-tenant.js` to create the tenants table,
+      seed platform admin + mys/icp, and backfill existing rows → MYS.
+- [ ] Test end-to-end: visit /mys and /icp, log in, create events, verify
+      isolation (mys admin can't see icp data), set per-tenant Paystack + branding.
+
+NOTE: All scoping uses tenantWhere() which INCLUDES NULL rows, so a single-tenant
+install (no tenants table populated) keeps working unchanged. The base MYS data
+becomes tenant "mys" after the backfill.
