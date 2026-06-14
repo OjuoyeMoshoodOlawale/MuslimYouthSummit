@@ -5,10 +5,10 @@ export default {
     extend: {
       colors: {
         brand: {
-          green: 'var(--brand-primary, #02462E)',
-          gold: 'var(--brand-secondary, #FEC700)',
-          lightgreen: 'var(--brand-accent, #6BBC01)',
-          cream: 'var(--brand-bg, #FBF6E6)',
+          green: 'rgb(var(--brand-primary-rgb, 2 70 46) / <alpha-value>)',
+          gold: 'rgb(var(--brand-secondary-rgb, 254 199 0) / <alpha-value>)',
+          lightgreen: 'rgb(var(--brand-accent-rgb, 107 188 1) / <alpha-value>)',
+          cream: 'rgb(var(--brand-bg-rgb, 251 246 230) / <alpha-value>)',
         },
       },
       fontFamily: {

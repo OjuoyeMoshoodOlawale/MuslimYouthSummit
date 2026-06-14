@@ -14,6 +14,21 @@ import { success, created, error, notFound } from '../utils/response.js';
 
 const router = express.Router();
 
+/* ── PUBLIC: list active tenants (for the platform landing) ───────────── */
+router.get('/tenants', async (req, res, next) => {
+  try {
+    const [rows] = await query(
+      `SELECT slug, name, tagline, logo_url,
+              color_primary, color_secondary, color_accent
+       FROM tenants
+       WHERE status = 'active'
+       ORDER BY created_at ASC
+       LIMIT 60`
+    );
+    success(res, rows);
+  } catch (e) { next(e); }
+});
+
 /* ── PUBLIC: tenant info + published pages (for the branded landing) ───── */
 router.get('/tenants/:slug', resolveTenant, async (req, res, next) => {
   try {

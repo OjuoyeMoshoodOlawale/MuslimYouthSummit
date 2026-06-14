@@ -37,14 +37,21 @@ export const useTenantStore = defineStore('tenant', () => {
     }
   };
 
-  // Inject the tenant's colours as CSS variables (consumed by Tailwind/CSS)
+  // Inject the tenant's colours as CSS variables (consumed by Tailwind/CSS).
+  // Stored as "R G B" channel triplets so Tailwind's /opacity modifiers work.
   const applyTheme = (t) => {
     if (!t) return;
     const root = document.documentElement;
-    root.style.setProperty('--brand-primary',   t.color_primary   || '#02462E');
-    root.style.setProperty('--brand-secondary', t.color_secondary || '#FEC700');
-    root.style.setProperty('--brand-accent',    t.color_accent    || '#6BBC01');
-    root.style.setProperty('--brand-bg',        t.color_bg        || '#FBF6E6');
+    const toRgb = (hex) => {
+      const m = (hex || '').replace('#', '');
+      if (m.length !== 6) return null;
+      return `${parseInt(m.slice(0,2),16)} ${parseInt(m.slice(2,4),16)} ${parseInt(m.slice(4,6),16)}`;
+    };
+    const set = (varName, hex) => { const rgb = toRgb(hex); if (rgb) root.style.setProperty(varName, rgb); };
+    set('--brand-primary-rgb',   t.color_primary   || '#02462E');
+    set('--brand-secondary-rgb', t.color_secondary || '#FEC700');
+    set('--brand-accent-rgb',    t.color_accent    || '#6BBC01');
+    set('--brand-bg-rgb',        t.color_bg        || '#FBF6E6');
     if (t.favicon_url) {
       let link = document.querySelector("link[rel~='icon']");
       if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
