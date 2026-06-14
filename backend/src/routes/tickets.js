@@ -4,6 +4,7 @@ import { authenticate, authorize } from '../middleware/auth.js';
 import { validate, rules } from '../middleware/validate.js';
 import { query } from '../database/db.js';
 import { success as ok, error as err, notFound as notFoundRes } from '../utils/response.js';
+import { stampId } from '../utils/tenantScope.js';
 import {
   initiateTicketPurchase, verifyTicketPayment,
   paystackWebhook, getTicket,
@@ -127,17 +128,18 @@ router.post('/manual', authenticate, authorize('super_admin','admin','department
     // Family registrations: lookup by email + name (not just email)
     // This allows one parent email to register multiple children with different names
     let participantId;
+    const tId = stampId(req);
     const [existing] = await query(
-      'SELECT id FROM participants WHERE email=? AND name=?',
-      [email.toLowerCase(), name.trim()]
+      'SELECT id FROM participants WHERE email=? AND name=? AND (tenant_id=? OR (? IS NULL AND tenant_id IS NULL))',
+      [email.toLowerCase(), name.trim(), tId, tId]
     );
     if (existing.length) {
       participantId = existing[0].id;
       await query('UPDATE participants SET phone=?, updated_at=NOW() WHERE id=?', [phone, participantId]);
     } else {
       const [ins] = await query(
-        'INSERT INTO participants (name, email, phone, gender, occupation, email_subscribed) VALUES (?,?,?,?,?,1)',
-        [name.trim(), email.toLowerCase(), phone, gender||null, occupation||null]
+        'INSERT INTO participants (name, email, phone, gender, occupation, email_subscribed, tenant_id) VALUES (?,?,?,?,?,1,?)',
+        [name.trim(), email.toLowerCase(), phone, gender||null, occupation||null, tId]
       );
       participantId = ins.insertId;
     }

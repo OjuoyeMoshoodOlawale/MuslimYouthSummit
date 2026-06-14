@@ -3,6 +3,7 @@ import { success, created, error, notFound as notFoundRes } from '../utils/respo
 import { initializeTransaction, verifyTransaction, verifyWebhookSignature } from '../services/paystackService.js';
 import { grossUpForPaystack } from '../utils/paystackFees.js';
 import { resolvePaystackKeys } from '../utils/paystackKeys.js';
+import { stampId } from '../utils/tenantScope.js';
 import { generateQRCodeSVG, ticketQRData } from '../services/qrcodeService.js';
 import { sendTicketEmail } from '../services/emailService.js';
 import {
@@ -58,9 +59,14 @@ export const initiateTicketPurchase = async (req, res, next) => {
     const { total: chargeAmount } = grossUpForPaystack(price);
     const amountKobo    = toKobo(chargeAmount);
 
-    // Find or create participant (schema: name, email, phone, gender, occupation)
+    // Find or create participant — scoped to THIS tenant so the same email in
+    // another organisation doesn't get reused here.
     let participantId;
-    const [existing] = await query('SELECT id FROM participants WHERE email = ?', [email.toLowerCase()]);
+    const tId = stampId(req);
+    const [existing] = await query(
+      'SELECT id FROM participants WHERE email = ? AND (tenant_id = ? OR (? IS NULL AND tenant_id IS NULL)) LIMIT 1',
+      [email.toLowerCase(), tId, tId]
+    );
 
     if (existing.length) {
       participantId = existing[0].id;
@@ -70,9 +76,9 @@ export const initiateTicketPurchase = async (req, res, next) => {
       );
     } else {
       const [inserted] = await query(
-        `INSERT INTO participants (name, email, phone, gender, occupation)
-         VALUES (?, ?, ?, ?, ?)`,
-        [name, email.toLowerCase(), phone, gender || null, occupation || null]
+        `INSERT INTO participants (name, email, phone, gender, occupation, tenant_id)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [name, email.toLowerCase(), phone, gender || null, occupation || null, tId]
       );
       participantId = inserted.insertId;
     }
