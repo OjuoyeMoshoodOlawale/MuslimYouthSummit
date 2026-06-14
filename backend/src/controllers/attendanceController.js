@@ -42,7 +42,9 @@ export const checkIn = async (req, res, next) => {
       check_out_at:        tk.checked_out_at,
       attendance_id:       tk.attendance_id,
       tag_number:          tk.tag_number,
-    }, tk.checked_in_at ? '⚠️ Already checked in' : '✅ Valid ticket');
+    }, tk.checked_in_at && !tk.checked_out_at ? '⚠️ Already checked in (on-site)'
+       : tk.checked_out_at ? '↩️ Previously checked out — can check in again'
+       : '✅ Valid ticket');
   } catch (e) { next(e); }
 };
 
@@ -62,14 +64,17 @@ export const assignTagAndCheckIn = async (req, res, next) => {
     if (!tickets.length) return error(res, 'Invalid or unpaid ticket.', 404);
     const ticket = tickets[0];
 
-    /* Check already checked in */
+    /* Block only if currently ON-SITE (checked in and NOT checked out).
+       Someone who checked out and came back should be allowed to check in again. */
     const [existing] = await query(
-      'SELECT id, checked_in_at FROM attendance WHERE ticket_id = ? AND event_id = ?',
+      'SELECT id, checked_in_at, checked_out_at FROM attendance WHERE ticket_id = ? AND event_id = ?',
       [ticket_id, event_id]
     );
-    if (existing.length && existing[0].checked_in_at) {
-      return error(res, '⚠️ This participant is already checked in.', 409);
+    const currentlyOnSite = existing.length && existing[0].checked_in_at && !existing[0].checked_out_at;
+    if (currentlyOnSite) {
+      return error(res, '⚠️ This participant is already checked in and on-site.', 409);
     }
+    const isReentry = existing.length && existing[0].checked_out_at;
 
     let tagId = null;
 
@@ -105,8 +110,10 @@ export const assignTagAndCheckIn = async (req, res, next) => {
 
     /* Create/update attendance */
     if (existing.length) {
+      // Re-check-in: refresh check-in time and CLEAR any previous checkout so
+      // the person shows as on-site again after returning.
       await query(
-        'UPDATE attendance SET tag_id=?, checked_in_at=NOW(), check_in_by=? WHERE id=?',
+        'UPDATE attendance SET tag_id=?, checked_in_at=NOW(), checked_out_at=NULL, check_in_by=? WHERE id=?',
         [tagId, req.admin?.id || null, existing[0].id]
       );
     } else {
@@ -117,6 +124,7 @@ export const assignTagAndCheckIn = async (req, res, next) => {
     }
 
     const tagMsg = tag_number ? ` Tag ${tag_number.toUpperCase()} assigned.` : '';
+    const reentryMsg = isReentry ? ' (Welcome back!)' : '';
 
     // Send check-in email (non-blocking)
     try {
@@ -151,7 +159,7 @@ export const assignTagAndCheckIn = async (req, res, next) => {
       }
     } catch {}
 
-    return success(res, { tag_number, ticket_id }, `Check-in complete!${tagMsg}`);
+    return success(res, { tag_number, ticket_id }, `Check-in complete!${tagMsg}${reentryMsg}`);
   } catch (e) { next(e); }
 };
 
