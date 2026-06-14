@@ -42,7 +42,7 @@
           Admin preview — this event hasn't concluded yet. Participants can't access this until it's completed.
         </div>
         <div id="certificate" class="bg-white shadow-2xl border-8 border-brand-green relative overflow-hidden mx-auto"
-          style="aspect-ratio: 1/1.414; max-width: 210mm;">
+          style="aspect-ratio: 1.414/1; max-width: 297mm;">
           <!-- Decorative corners -->
           <div class="absolute top-0 left-0 w-10 h-10 sm:w-24 sm:h-24 border-t-2 sm:border-t-4 border-l-2 sm:border-l-4 border-brand-gold m-2 sm:m-4"></div>
           <div class="absolute top-0 right-0 w-10 h-10 sm:w-24 sm:h-24 border-t-2 sm:border-t-4 border-r-2 sm:border-r-4 border-brand-gold m-2 sm:m-4"></div>
@@ -133,7 +133,7 @@ const printCert  = () => window.print();
 
 <style>
 @media print {
-  @page { size: A4 portrait; margin: 0; }
+  @page { size: A4 landscape; margin: 0; }
   .no-print, nav { display: none !important; }
   #certificate {
     box-shadow: none !important;
