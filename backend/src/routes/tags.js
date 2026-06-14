@@ -20,7 +20,7 @@ router.get('/lookup/:tagNumber', async (req, res, next) => {
               c.name  AS category_name, c.color AS category_color,
               tk.unique_number,
               e.title AS event_title, e.edition,
-              a.check_in_at, a.check_out_at
+              a.checked_in_at, a.checked_out_at
        FROM event_tags et
        LEFT JOIN participants p   ON p.id = et.participant_id
        LEFT JOIN tickets tk       ON tk.id = et.ticket_id
@@ -28,7 +28,7 @@ router.get('/lookup/:tagNumber', async (req, res, next) => {
        LEFT JOIN events e         ON e.id = et.event_id
        LEFT JOIN attendance a     ON a.ticket_id = et.ticket_id
        WHERE et.tag_number = ?
-       ORDER BY a.check_in_at DESC
+       ORDER BY a.checked_in_at DESC
        LIMIT 1`,
       [tagNumber]
     );
@@ -50,8 +50,8 @@ router.get('/lookup/:tagNumber', async (req, res, next) => {
         category:      t.category_name,
         category_color: t.category_color,
         ticket_number: t.unique_number,
-        checked_in:    !!t.check_in_at,
-        checked_out:   !!t.check_out_at,
+        checked_in:    !!t.checked_in_at,
+        checked_out:   !!t.checked_out_at,
         assigned_at:   t.assigned_at,
       } : null,
     });
