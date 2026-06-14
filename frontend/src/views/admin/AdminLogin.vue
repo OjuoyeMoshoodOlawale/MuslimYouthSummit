@@ -88,7 +88,9 @@ const handleLogin = async () => {
   const res = await auth.login(form.email, form.password);
   loading.value     = false;
   if (res.success) {
-    const redirect = route.query.redirect || '/admin/dashboard';
+    const slug = route.params.slug;
+    const fallback = slug ? `/${slug}/admin/dashboard` : '/admin/dashboard';
+    const redirect = route.query.redirect || fallback;
     router.push(redirect);
   } else {
     serverError.value = res.message || 'Login failed. Please check your credentials.';

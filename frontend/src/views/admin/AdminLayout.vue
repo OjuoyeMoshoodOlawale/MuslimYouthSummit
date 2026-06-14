@@ -159,7 +159,11 @@ onUnmounted(() => {
   window.removeEventListener('resize', onResize);
 });
 
-const handleLogout = () => { auth.logout(); router.push('/admin/login'); };
+const handleLogout = () => {
+  auth.logout();
+  const slug = route.params.slug;
+  router.push(slug ? `/${slug}/admin/login` : '/admin/login');
+};
 </script>
 
 <style scoped>

@@ -123,8 +123,23 @@ const router = createRouter({
 });
 
 /* ─── Navigation guard ───────────────────────────────────── */
-router.beforeEach(async (to, _from, next) => {
+router.beforeEach(async (to, from, next) => {
   const auth = useAuthStore();
+
+  // ── Legacy link rescue: a hardcoded link like /admin/dashboard or /register
+  //    (no slug) was followed while we're inside a tenant. Re-inject the slug
+  //    from the current route so old links keep working.
+  const SLUGLESS = /^\/(admin|register|shop|check-in|ticket|certificate|tag|past-events)(\/|$)/;
+  if (SLUGLESS.test(to.path) && !to.path.startsWith('/platform')) {
+    const currentSlug = from.params?.slug
+      || useTenantStore().slug
+      || null;
+    if (currentSlug) {
+      return next(`/${currentSlug}${to.path}${to.hash || ''}`);
+    }
+    // No tenant context → send to picker
+    return next({ name: 'root' });
+  }
 
   // Platform-admin pages
   if (to.meta.requiresPlatform) {

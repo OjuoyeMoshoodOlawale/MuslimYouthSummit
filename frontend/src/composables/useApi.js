@@ -24,7 +24,12 @@ api.interceptors.response.use(
     if (err.response?.status === 401) {
       localStorage.removeItem('mys_token');
       localStorage.removeItem('mys_admin');
-      if (window.location.pathname.startsWith('/admin')) {
+      // Redirect to the tenant's admin login if we're in an admin area.
+      const path = window.location.pathname;
+      const m = path.match(/^\/([a-z0-9-]+)\/admin/);
+      if (m) {
+        window.location.replace(`/${m[1]}/admin/login`);
+      } else if (path.startsWith('/admin')) {
         window.location.replace('/admin/login');
       }
     }
