@@ -1,5 +1,4 @@
 import express from 'express';
-import jwt from 'jsonwebtoken';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { validate, rules } from '../middleware/validate.js';
 import { query } from '../database/db.js';
@@ -171,26 +170,15 @@ router.get('/certificate/:ref', async (req, res, next) => {
 
     const cert = rows[0];
 
-    // Admin preview bypass — if a valid admin token is present (header or query),
-    // allow viewing the certificate at any time for testing/printing.
-    let isAdmin = false;
-    try {
-      const hdr = req.headers.authorization;
-      const tok = (hdr && hdr.startsWith('Bearer ')) ? hdr.split(' ')[1] : req.query.token;
-      if (tok) {
-        const decoded = jwt.verify(tok, process.env.JWT_SECRET);
-        if (decoded?.id) isAdmin = true;
-      }
-    } catch { /* invalid/expired token → treat as public */ }
-
-    // Public visitors: certificate available once the event is completed OR ended
+    // Certificate is available ONLY once the event is completed OR its end date passed.
+    // This rule applies to everyone, including admins — no preview before conclusion.
     const endPassed = cert.end_date && new Date(cert.end_date) < new Date();
     const isReady   = cert.event_status === 'completed' || endPassed;
 
-    if (!isAdmin && !isReady) {
+    if (!isReady) {
       return err(res, 'Your certificate will be available after the event has concluded.', 403);
     }
 
-    ok(res, { ...cert, preview: isAdmin && !isReady });
+    ok(res, cert);
   } catch (e) { next(e); }
 });
