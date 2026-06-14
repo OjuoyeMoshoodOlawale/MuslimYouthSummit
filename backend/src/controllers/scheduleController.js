@@ -17,6 +17,7 @@ export const getSchedule = async (req, res, next) => {
          l.start_time, l.end_time,
          l.title, l.lecture_type,
          l.main_speaker_name, l.facilitators,
+         l.youtube_url,
          l.description, l.sort_order,
          GROUP_CONCAT(s.name ORDER BY ls.sort_order SEPARATOR '||') AS speaker_names,
          GROUP_CONCAT(s.id  ORDER BY ls.sort_order SEPARATOR ',')  AS speaker_ids

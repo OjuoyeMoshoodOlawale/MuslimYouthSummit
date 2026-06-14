@@ -1,7 +1,7 @@
 {
   "name": "mys-platform-backend",
   "version": "2.0.0",
-  "description": "Muslim Youth Summit Platform \u2014 Express API",
+  "description": "Muslim Youth Summit Platform — Express API",
   "type": "module",
   "main": "src/index.js",
   "scripts": {
@@ -29,7 +29,8 @@
     "mysql2": "^3.6.5",
     "nodemailer": "^6.9.7",
     "qrcode": "^1.5.3",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "qrcode-svg": "^1.1.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
