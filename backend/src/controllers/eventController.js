@@ -1,6 +1,7 @@
 import { query, transaction } from '../database/db.js';
 import { success, created, error, notFound as notFoundRes, paginated, buildPagination } from '../utils/response.js';
 import { parsePagination } from '../utils/helpers.js';
+import { tenantWhere, stampId } from '../utils/tenantScope.js';
 
 // ═══════════════════════════════════════════════════════════
 // PUBLIC ENDPOINTS
@@ -9,12 +10,14 @@ import { parsePagination } from '../utils/helpers.js';
 // ── Get Active Event ─────────────────────────────────────────
 export const getActiveEvent = async (req, res, next) => {
   try {
+    const t = tenantWhere(req, 'e');
     const [events] = await query(
       `SELECT e.*, a.name AS created_by_name
        FROM events e
        LEFT JOIN admins a ON a.id = e.created_by
-       WHERE e.status = 'active'
-       ORDER BY e.start_date ASC LIMIT 1`
+       WHERE e.status = 'active'${t.clause}
+       ORDER BY e.start_date ASC LIMIT 1`,
+      [...t.params]
     );
 
     if (events.length) {
@@ -49,12 +52,14 @@ export const getActiveEvent = async (req, res, next) => {
 // ── Get All Events (public + admin dropdown) ─────────────────
 export const getPublicEvents = async (req, res, next) => {
   try {
+    const t = tenantWhere(req);
     const [events] = await query(
       `SELECT id, title, tagline, edition, start_date, end_date,
               venue, status, cover_image_url, early_bird_closes_at,
               CONCAT('[', edition, '] ', title) AS display_title
-       FROM events WHERE status IN ('active','completed','draft','archived')
-       ORDER BY start_date DESC`
+       FROM events WHERE status IN ('active','completed','draft','archived')${t.clause}
+       ORDER BY start_date DESC`,
+      [...t.params]
     );
     return success(res, events);
   } catch (err) {
@@ -176,11 +181,14 @@ export const adminListEvents = async (req, res, next) => {
     const statusFilter = req.query.status || null;
 
     const params = [];
-    let whereClause = '';
+    let whereClause = 'WHERE 1=1';
     if (statusFilter) {
-      whereClause = 'WHERE e.status = ?';
+      whereClause += ' AND e.status = ?';
       params.push(statusFilter);
     }
+    const t = tenantWhere(req, 'e');
+    whereClause += t.clause;
+    params.push(...t.params);
 
     const [[{ total }]] = await query(
       `SELECT COUNT(*) AS total FROM events e ${whereClause}`,
@@ -220,13 +228,13 @@ export const createEvent = async (req, res, next) => {
     const [result] = await query(
       `INSERT INTO events
         (title, tagline, edition, slug, description, start_date, end_date,
-         venue, venue_address, early_bird_closes_at, status, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?)`,
+         venue, venue_address, early_bird_closes_at, status, created_by, tenant_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?)`,
       [
         title, tagline || null, edition, slug, description || null,
         start_date, end_date,
         venue || null, venue_address || null, early_bird_closes_at || null,
-        req.admin.id,
+        req.admin.id, stampId(req),
       ]
     );
 

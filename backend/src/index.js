@@ -32,6 +32,7 @@ import smsRoutes         from './routes/sms.js';
 import testRoutes        from './routes/test.js';
 import tagPrintRoutes    from './routes/tagPrint.js';
 import tenantRoutes      from './routes/tenant.js';
+import { resolveTenantOptional } from './middleware/tenant.js';
 import platformRoutes    from './routes/platform.js';
 import { cloneEvent }    from './controllers/cloneController.js';
 import { authenticate, authorize } from './middleware/auth.js';
@@ -112,6 +113,11 @@ app.get('/api/health', (req, res) => {
 });
 
 // ─── Routes ─────────────────────────────────────────────────
+// Resolve the tenant (from X-Tenant-Slug header) for every API request so
+// controllers can scope by req.tenant.id. Optional so platform/auth routes
+// without a tenant still work.
+app.use('/api', resolveTenantOptional);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/tickets', ticketRoutes);

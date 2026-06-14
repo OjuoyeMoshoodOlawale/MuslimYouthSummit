@@ -8,12 +8,18 @@ export const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
+    // Scope login to the current tenant (same email may exist across tenants).
+    // If no tenant context, match any (backwards compatible for single-tenant).
+    const tenantId = req.tenant?.id || null;
     const [admins] = await query(
       `SELECT a.*, d.name AS department_name
        FROM admins a
        LEFT JOIN departments d ON d.id = a.department_id
-       WHERE a.email = ? AND a.is_active = 1`,
-      [email.toLowerCase()]
+       WHERE a.email = ? AND a.is_active = 1
+         AND (? IS NULL OR a.tenant_id = ? OR a.tenant_id IS NULL)
+       ORDER BY (a.tenant_id = ?) DESC
+       LIMIT 1`,
+      [email.toLowerCase(), tenantId, tenantId, tenantId]
     );
     if (!admins.length) return error(res, 'Invalid email or password.', 401);
 
@@ -30,6 +36,7 @@ export const login = async (req, res, next) => {
       name:          admin.name,
       role:          admin.role,
       department_id: admin.department_id,
+      tenant_id:     admin.tenant_id || null,
     };
 
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
