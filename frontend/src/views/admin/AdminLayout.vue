@@ -114,7 +114,7 @@ const route  = useRoute();
 const router = useRouter();
 
 const sidebarOpen      = ref(false);
-const sidebarCollapsed = ref(false);
+const sidebarCollapsed = ref(true);
 const userMenuOpen     = ref(false);
 const userMenuRef      = ref(null);
 const pendingExpenses  = ref(0);

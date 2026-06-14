@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { query } from '../database/db.js';
+import { generateQRCodeSVG, tagQRData } from '../services/qrcodeService.js';
 
 const router = express.Router();
 
@@ -67,6 +68,20 @@ router.get('/events/:eventId/tags/print', authenticate, async (req, res, next) =
     const [tags] = await query(tagQuery, tagParams);
     if (!tags.length) return res.status(404).send('<h1>No tags found for the given criteria.</h1>');
 
+    // Generate (or refresh) the QR for every tag → points to /tag/:tagNumber.
+    // Tags are created blank (no QR), so we generate here and persist it.
+    let qrFailures = 0;
+    for (const tag of tags) {
+      try {
+        tag.qr_code_svg = await generateQRCodeSVG(tagQRData(tag.tag_number, eventId, BASE_URL));
+        query('UPDATE event_tags SET qr_code_svg=? WHERE id=?', [tag.qr_code_svg, tag.id]).catch(() => {});
+      } catch (qrErr) {
+        qrFailures++;
+        console.error(`[Tag QR] Failed for ${tag.tag_number}: ${qrErr.message}`);
+      }
+    }
+    if (qrFailures) console.error(`[Tag QR] ${qrFailures}/${tags.length} QR failed. Check backend/src/vendor/qrcode-svg.cjs`);
+
     // Mark as printed
     const tagIds = tags.map(t => t.id);
     await query(`UPDATE event_tags SET is_printed=1 WHERE id IN (${tagIds.map(()=>'?').join(',')})`, tagIds);
@@ -76,7 +91,9 @@ router.get('/events/:eventId/tags/print', authenticate, async (req, res, next) =
     const buildBadge = (tag, event) => {
       const tagNum = tag.tag_number || '???';
       const qr = tag.qr_code_svg
-        ? tag.qr_code_svg.replace('<svg', '<svg width="150" height="150"')
+        ? tag.qr_code_svg
+            .replace(/width="\d+"/, 'width="150"')
+            .replace(/height="\d+"/, 'height="150"')
         : buildFallbackQR(tagNum);
 
       return `
